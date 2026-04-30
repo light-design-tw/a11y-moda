@@ -32,6 +32,23 @@ class _RateLimiter:
                 self._last = now
 
 
+def _run_rules(rules, soup, report, *, html, url, ctx, llm_workers: int = 1) -> None:
+    """Run rules on a page. Non-LLM rules go first sequentially (some share
+    ctx.state across rules); LLM rules then fan out to a thread pool when
+    llm_workers > 1 (LLM calls are I/O bound).
+    """
+    non_llm = [r for r in rules if not getattr(r, "uses_llm", False)]
+    llm_rules = [r for r in rules if getattr(r, "uses_llm", False)]
+    for r in non_llm:
+        r.check(soup, report, html=html, url=url, ctx=ctx)
+    if llm_workers > 1 and llm_rules:
+        with ThreadPoolExecutor(max_workers=llm_workers) as ex:
+            list(ex.map(lambda r: r.check(soup, report, html=html, url=url, ctx=ctx), llm_rules))
+    else:
+        for r in llm_rules:
+            r.check(soup, report, html=html, url=url, ctx=ctx)
+
+
 def scan_page(
     url: str,
     *,
@@ -42,6 +59,7 @@ def scan_page(
     sources: set[str] | None = None,
     llm=None,
     browser=None,
+    llm_workers: int = 1,
 ) -> PageReport:
     """Scan one URL.
 
@@ -49,12 +67,16 @@ def scan_page(
     from it and reuse that page for fetch + all probes — saves repeated
     chromium spawns and goto/networkidle waits across the 4 distinct sessions
     the standalone path uses.
+
+    llm_workers controls per-page LLM rule concurrency (1 = serial; default).
+    Set higher when the LLM endpoint can serve concurrent requests.
     """
     capture_shots = bool(llm and render and llm.supports_vision())
     if render and browser is not None:
         return _scan_page_with_browser(url, browser=browser, level=level,
                                         freego_compat=freego_compat, ignore=ignore,
-                                        sources=sources, llm=llm, capture_shots=capture_shots)
+                                        sources=sources, llm=llm, capture_shots=capture_shots,
+                                        llm_workers=llm_workers)
     # Standalone path — used for static scans and single-URL render scans.
     report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots)
     if soup is None:
@@ -74,12 +96,12 @@ def scan_page(
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
-    for rule in all_rules(level=level, sources=sources):
-        rule.check(soup, report, html=html, url=url, ctx=ctx)
+    _run_rules(list(all_rules(level=level, sources=sources)), soup, report,
+                html=html, url=url, ctx=ctx, llm_workers=llm_workers)
     return report
 
 
-def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots) -> PageReport:
+def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1) -> PageReport:
     """Render path using a shared browser. Fresh context per URL (incognito
     isolation), shared page across fetch + 3 probes (contrast/tab_walk/form).
     Form probe runs LAST because it mutates page state (clicks modal triggers).
@@ -105,8 +127,8 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
-        for rule in all_rules(level=level, sources=sources):
-            rule.check(soup, report, html=html, url=url, ctx=ctx)
+        _run_rules(list(all_rules(level=level, sources=sources)), soup, report,
+                    html=html, url=url, ctx=ctx, llm_workers=llm_workers)
         return report
 
 
@@ -123,6 +145,7 @@ def scan_urls(
     rps: float = 0.0,
     sources: set[str] | None = None,
     llm=None,
+    llm_workers: int = 1,
 ) -> ScanReport:
     """Parallel scan of many URLs.
 
@@ -140,7 +163,7 @@ def scan_urls(
             time.sleep(delay)
         return scan_page(u, level=level, render=render,
                          freego_compat=freego_compat, ignore=ignore, sources=sources,
-                         llm=llm, browser=browser)
+                         llm=llm, browser=browser, llm_workers=llm_workers)
 
     if render:
         # Serial when rendering. Share one chromium across the whole site;

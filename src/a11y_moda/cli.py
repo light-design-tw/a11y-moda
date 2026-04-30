@@ -84,18 +84,24 @@ def main() -> None:
 @click.option("--llm-base-url", default=None, help="OpenAI-compatible endpoint, e.g. https://api.openai.com/v1")
 @click.option("--llm-key", default=None, help="API key (falls back to A11Y_LLM_KEY / OPENAI_API_KEY env)")
 @click.option("--llm-model", default=None, help="Model name (falls back to A11Y_LLM_MODEL env)")
+@click.option("--llm-concurrency", type=int, default=1,
+              help="Per-page LLM rule concurrency. Default 1 (serial). Raise on endpoints that "
+                   "serve concurrent requests well (vLLM batched, OpenAI/Anthropic API). "
+                   "Local single-GPU models may degrade or OOM above 1.")
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")
 @click.option("--output", "-o", type=click.Path(), default=None,
               help="If extension is .md/.html, format auto-detected")
 def scan(url: str, level: str, render: bool, freego_compat: bool,
          ignore: tuple[str, ...], freego_only: bool, no_extension: bool,
          fail_only: bool, llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
+         llm_concurrency: int,
          fmt: str, output: str | None) -> None:
     """Scan a single URL."""
     sources = {"freego"} if (freego_only or no_extension) else None
     llm = _build_llm(llm_base_url, llm_key, llm_model)
     report = scan_page(url, level=Level[level], render=render,
-                       freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm)
+                       freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
+                       llm_workers=llm_concurrency)
     if fail_only:
         report.issues = [i for i in report.issues if i.status == "fail"]
     fmt = _resolve_fmt(fmt, output)
@@ -134,6 +140,10 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
 @click.option("--llm-base-url", default=None, help="OpenAI-compatible endpoint")
 @click.option("--llm-key", default=None, help="API key (env fallback)")
 @click.option("--llm-model", default=None, help="Model name (env fallback)")
+@click.option("--llm-concurrency", type=int, default=1,
+              help="Per-page LLM rule concurrency. Default 1 (serial). Raise on endpoints that "
+                   "serve concurrent requests well (vLLM batched, OpenAI/Anthropic API). "
+                   "Local single-GPU models may degrade or OOM above 1.")
 @click.option("--group-by", type=click.Choice(["rule", "wcag", "url"]), default="rule",
               help="MD/JSON grouping (rule = most actionable; HTML always shows all 3 tabs)")
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")
@@ -146,6 +156,7 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          render_crawl: bool, exclude_url: tuple[str, ...], exclude_folder: tuple[str, ...],
          max_time: float,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
+         llm_concurrency: int,
          group_by: str, fmt: str, output: str | None) -> None:
     """Discover and scan a whole site."""
     if source == "sitemap":
@@ -169,7 +180,7 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
     scan_report = scan_urls(urls, level=Level[level], render=render,
                             freego_compat=freego_compat, ignore=ignore,
                             workers=workers, progress=True, delay=delay, rps=rps,
-                            sources=sources, llm=llm)
+                            sources=sources, llm=llm, llm_workers=llm_concurrency)
     if llm:
         print(f"LLM stats: {llm.stats}", file=sys.stderr)
     if fail_only:

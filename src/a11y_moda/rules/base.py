@@ -1,4 +1,5 @@
 from __future__ import annotations
+import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
@@ -36,6 +37,7 @@ class RuleContext:
 
 class Rule(ABC):
     meta: RuleMeta
+    uses_llm: bool = False  # set automatically by @register
 
     def check(self, soup: BeautifulSoup, report: PageReport, *, html: str = "", url: str = "", ctx: RuleContext | None = None) -> None:
         if ctx is None:
@@ -65,7 +67,22 @@ class Rule(ABC):
 _REGISTRY: list[type[Rule]] = []
 
 
+_LLM_MARKERS = ("ctx.llm", "judge_or_caveat", "judge_with_image", "from ..._lib.llm_", "from ..._lib.vision_rules")
+
+
 def register(cls: type[Rule]) -> type[Rule]:
+    """Register a rule. Auto-detect LLM use by inspecting the module source.
+
+    A rule is flagged uses_llm=True if its source imports any of the LLM helper
+    modules or calls ctx.llm / judge_or_caveat / judge_with_image directly.
+    Used by the scanner to fan LLM-bound rules out across worker threads while
+    keeping pure-DOM rules serial (they may share ctx.state).
+    """
+    try:
+        src = inspect.getsource(inspect.getmodule(cls))
+        cls.uses_llm = any(m in src for m in _LLM_MARKERS)
+    except (OSError, TypeError):
+        cls.uses_llm = False
     _REGISTRY.append(cls)
     return cls
 
