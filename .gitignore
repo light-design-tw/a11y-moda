@@ -1,0 +1,43 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+
+# Virtual envs
+.venv/
+venv/
+env/
+.env
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+reports/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Claude Code local state
+.claude/logs/
+.claude/sessions/
+
+# Playwright artifacts
+playwright-report/
+test-results/
