@@ -27,6 +27,7 @@ class RuleContext:
     ignore: set[str] = field(default_factory=set)  # rule_ids to skip
     text_samples: list = field(default_factory=list)   # populated when browser scan runs
     tab_stops: list = field(default_factory=list)
+    form_sims: list = field(default_factory=list)      # FormProbeResult, populated when browser scan runs
     browser_used: bool = False
     llm: Any = None  # LLMClient or None — rules check before using
     full_screenshot: bytes | None = None  # full-page PNG bytes (when --render)

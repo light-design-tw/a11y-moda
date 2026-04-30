@@ -55,8 +55,10 @@ def scan_page(
         try:
             from .tools.contrast import collect_text_samples
             from .tools.tab_walk import walk_tab_stops
+            from .tools.form_probe import probe_forms
             ctx.text_samples = collect_text_samples(url)
             ctx.tab_stops = walk_tab_stops(url)
+            ctx.form_sims = probe_forms(url)
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
