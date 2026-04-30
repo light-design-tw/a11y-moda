@@ -41,6 +41,35 @@ _FORM_SELECTORS_JS = r"""
 }
 """
 
+
+_MODAL_TRIGGER_HINTS = (
+    "預約", "諮詢", "聯絡我們", "聯繫我們", "聯繫", "預定", "報名", "申請",
+    "我要詢問", "詢問", "立即諮詢", "馬上預約", "免費諮詢",
+    "contact us", "contact", "get in touch", "request", "book now", "enquire", "inquiry",
+)
+
+
+_FIND_TRIGGERS_JS = r"""
+(hints) => {
+    const out = [];
+    const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+    candidates.forEach((el, i) => {
+        const text = (el.innerText || el.getAttribute('aria-label') || '').trim();
+        if (!text || text.length > 30) return;
+        const lower = text.toLowerCase();
+        for (const h of hints) {
+            if (text.includes(h) || lower.includes(h.toLowerCase())) {
+                let sel = el.tagName.toLowerCase();
+                if (el.id) sel += '#' + el.id;
+                out.push({ idx: i, tag: el.tagName.toLowerCase(), text: text.slice(0, 30), selector: sel });
+                break;
+            }
+        }
+    });
+    return out;
+}
+"""
+
 _FOCUS_AFTER_JS = r"""
 () => {
     const ae = document.activeElement;
@@ -65,9 +94,53 @@ _FOCUS_AFTER_JS = r"""
 """
 
 
+def _has_usable_form(forms_meta: list) -> bool:
+    return any(f.get("requiredCount", 0) > 0 and f.get("hasSubmit") for f in forms_meta)
+
+
+def _try_open_modal_forms(page, original_url: str, *, max_attempts: int = 3) -> None:
+    """Click up to max_attempts modal-trigger candidates; abort if URL navigates away."""
+    triggers = page.evaluate(_FIND_TRIGGERS_JS, list(_MODAL_TRIGGER_HINTS)) or []
+    seen_idx: set[int] = set()
+    for cand in triggers[:max_attempts * 2]:
+        idx = cand.get("idx")
+        if idx in seen_idx:
+            continue
+        seen_idx.add(idx)
+        if len(seen_idx) > max_attempts:
+            return
+        try:
+            clicked = page.evaluate(f"""
+                () => {{
+                    const all = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+                    const el = all[{idx}];
+                    if (!el) return false;
+                    el.click();
+                    return true;
+                }}
+            """)
+            if not clicked:
+                continue
+            page.wait_for_timeout(600)
+            if page.url != original_url:
+                page.goto(original_url, wait_until="domcontentloaded", timeout=15000)
+                continue
+            forms_now = page.evaluate(_FORM_SELECTORS_JS) or []
+            if _has_usable_form(forms_now):
+                return
+        except Exception:
+            continue
+
+
 def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
-                 ua: str = "Mozilla/5.0 a11y-moda") -> list[FormProbeResult]:
-    """For each form with required fields: trigger empty submit, record focus."""
+                 ua: str = "Mozilla/5.0 a11y-moda", try_modal_triggers: bool = True
+                 ) -> list[FormProbeResult]:
+    """For each form with required fields: trigger empty submit, record focus.
+
+    When try_modal_triggers is True and no usable forms are found on initial load,
+    attempt to click likely modal-opening buttons (e.g. 預約諮詢, contact us)
+    and re-probe so that forms inside dialogs are also covered.
+    """
     from playwright.sync_api import sync_playwright
     out: list[FormProbeResult] = []
     with sync_playwright() as p:
@@ -81,6 +154,9 @@ def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
             except Exception:
                 pass
             forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
+            if try_modal_triggers and not _has_usable_form(forms_meta):
+                _try_open_modal_forms(page, page_url)
+                forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
             for meta in forms_meta[:max_forms]:
                 idx = meta["index"]
                 selector = meta["selector"]
