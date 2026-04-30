@@ -11,6 +11,14 @@ _INTERACTIVE_ROLES = {
     "button", "link", "checkbox", "radio", "menuitem", "menuitemcheckbox",
     "menuitemradio", "option", "switch", "tab", "treeitem", "combobox", "slider",
 }
+# Roles whose WAI-ARIA design pattern uses roving tabindex — inactive items
+# legitimately carry tabindex="-1" while one sibling holds tabindex="0".
+# Arrow keys (not Tab) navigate between siblings.
+_ROVING_TABINDEX_ROLES = {
+    "tab", "menuitem", "menuitemcheckbox", "menuitemradio",
+    "treeitem", "option", "radio", "gridcell",
+    "columnheader", "rowheader",
+}
 
 
 @register
@@ -36,6 +44,9 @@ class KeyboardReachable(Rule):
                 if tag == "a" and not (el.get("href") or "").strip():
                     continue
                 if tag == "input" and (el.get("type") or "").lower() == "hidden":
+                    continue
+                roles = (el.get("role") or "").lower().split()
+                if any(r in _ROVING_TABINDEX_ROLES for r in roles):
                     continue
                 report.add(self._issue(
                     message=f"<{tag}> 設定 tabindex=\"-1\"，已從鍵盤 Tab 序列移除，無法以鍵盤聚焦。",
