@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable
 
-from .fetcher import fetch
+from .fetcher import fetch, fetch_with_page
 from .models import Level, PageReport, ScanReport
 from .rules import all_rules
 from .rules.base import RuleContext
@@ -41,9 +41,21 @@ def scan_page(
     ignore: Iterable[str] = (),
     sources: set[str] | None = None,
     llm=None,
+    browser=None,
 ) -> PageReport:
-    # When LLM has vision support, capture screenshots so vision rules can use them.
+    """Scan one URL.
+
+    When `browser` is given (a Playwright Browser), open a fresh context+page
+    from it and reuse that page for fetch + all probes — saves repeated
+    chromium spawns and goto/networkidle waits across the 4 distinct sessions
+    the standalone path uses.
+    """
     capture_shots = bool(llm and render and llm.supports_vision())
+    if render and browser is not None:
+        return _scan_page_with_browser(url, browser=browser, level=level,
+                                        freego_compat=freego_compat, ignore=ignore,
+                                        sources=sources, llm=llm, capture_shots=capture_shots)
+    # Standalone path — used for static scans and single-URL render scans.
     report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots)
     if soup is None:
         return report
@@ -65,6 +77,37 @@ def scan_page(
     for rule in all_rules(level=level, sources=sources):
         rule.check(soup, report, html=html, url=url, ctx=ctx)
     return report
+
+
+def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots) -> PageReport:
+    """Render path using a shared browser. Fresh context per URL (incognito
+    isolation), shared page across fetch + 3 probes (contrast/tab_walk/form).
+    Form probe runs LAST because it mutates page state (clicks modal triggers).
+    """
+    from .tools._session import page_session
+    from .tools.contrast import collect_text_samples_from_page
+    from .tools.tab_walk import walk_tab_stops_from_page
+    from .tools.form_probe import probe_forms_from_page
+    with page_session(browser) as page:
+        report, soup, html, full_png, vp_png = fetch_with_page(
+            page, url, capture_screenshot=capture_shots,
+        )
+        if soup is None:
+            return report
+        ctx = RuleContext(freego_compat=freego_compat, ignore=set(ignore), llm=llm,
+                          full_screenshot=full_png, viewport_screenshot=vp_png)
+        if level == Level.AAA:
+            ctx.state["strict_aaa"] = True
+        try:
+            ctx.text_samples = collect_text_samples_from_page(page)
+            ctx.tab_stops = walk_tab_stops_from_page(page)
+            ctx.form_sims = probe_forms_from_page(page, url)
+            ctx.browser_used = True
+        except Exception as e:
+            ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
+        for rule in all_rules(level=level, sources=sources):
+            rule.check(soup, report, html=html, url=url, ctx=ctx)
+        return report
 
 
 def scan_urls(
@@ -90,23 +133,27 @@ def scan_urls(
     out = ScanReport()
     limiter = _RateLimiter(rps) if rps > 0 else None
 
-    def _one(u: str) -> PageReport:
+    def _one(u: str, browser=None) -> PageReport:
         if limiter:
             limiter.wait()
         if delay > 0:
             time.sleep(delay)
         return scan_page(u, level=level, render=render,
-                         freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm)
+                         freego_compat=freego_compat, ignore=ignore, sources=sources,
+                         llm=llm, browser=browser)
 
     if render:
-        # Serial when rendering — Playwright contexts are RAM-hungry, parallelism risks OOM.
-        for i, url in enumerate(urls, 1):
-            if progress:
-                print(f"[{i}/{len(urls)}] {url}", file=sys.stderr)
-            try:
-                out.add(_one(url))
-            except Exception as e:
-                out.add(PageReport(url=url, fetch_error=f"{type(e).__name__}: {e}"))
+        # Serial when rendering. Share one chromium across the whole site;
+        # each URL still gets a fresh incognito context for clean isolation.
+        from .tools._session import shared_browser
+        with shared_browser() as browser:
+            for i, url in enumerate(urls, 1):
+                if progress:
+                    print(f"[{i}/{len(urls)}] {url}", file=sys.stderr)
+                try:
+                    out.add(_one(url, browser=browser))
+                except Exception as e:
+                    out.add(PageReport(url=url, fetch_error=f"{type(e).__name__}: {e}"))
         return out
 
     with ThreadPoolExecutor(max_workers=workers) as ex:

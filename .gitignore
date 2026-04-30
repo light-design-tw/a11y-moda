@@ -35,8 +35,7 @@ reports/
 .ruff_cache/
 
 # Claude Code local state
-.claude/logs/
-.claude/sessions/
+**/.claude/
 
 # Playwright artifacts
 playwright-report/

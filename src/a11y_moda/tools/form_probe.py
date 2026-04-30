@@ -199,75 +199,79 @@ def _try_open_modal_forms(page, original_url: str, *, max_attempts: int = 3) -> 
             continue
 
 
+def probe_forms_from_page(page, original_url: str, *, max_forms: int = 5,
+                           try_modal_triggers: bool = True) -> list[FormProbeResult]:
+    """Probe forms on an already-navigated Playwright page.
+
+    Mutates page state (clicks modal triggers, submits forms) — caller should
+    treat page as dirty afterwards. URL navigation is reverted in-place.
+    """
+    out: list[FormProbeResult] = []
+    forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
+    if try_modal_triggers and not _has_usable_form(forms_meta):
+        _try_open_modal_forms(page, original_url)
+        forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
+    for meta in forms_meta[:max_forms]:
+        idx = meta["index"]
+        selector = meta["selector"]
+        has_req = meta["requiredCount"] > 0
+        input_count = int(meta.get("inputCount", 0))
+        if not has_req or not meta["hasSubmit"]:
+            out.append(FormProbeResult(
+                index=idx, selector=selector, has_required=has_req,
+                submit_clicked=False, error_focus_jumped=False,
+                focus_after_submit_tag="", focus_after_submit_selector="",
+                input_count=input_count,
+            ))
+            continue
+        try:
+            page.evaluate(f"""
+                () => {{
+                    const f = document.querySelectorAll('form')[{idx}];
+                    if (!f) return;
+                    const sb = f.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
+                    if (sb) sb.click();
+                }}
+            """)
+            page.wait_for_timeout(300)
+            focus = page.evaluate(_FOCUS_AFTER_JS) or {}
+            out.append(FormProbeResult(
+                index=idx,
+                selector=selector,
+                has_required=True,
+                submit_clicked=True,
+                error_focus_jumped=bool(focus.get("isInvalidRequired")),
+                focus_after_submit_tag=focus.get("tag", ""),
+                focus_after_submit_selector=focus.get("selector", ""),
+                input_count=input_count,
+            ))
+        except Exception as e:
+            out.append(FormProbeResult(
+                index=idx, selector=selector, has_required=True,
+                submit_clicked=False, error_focus_jumped=False,
+                focus_after_submit_tag="", focus_after_submit_selector="",
+                input_count=input_count,
+                error=f"{type(e).__name__}: {e}",
+            ))
+    return out
+
+
 def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
                  ua: str = "Mozilla/5.0 a11y-moda", try_modal_triggers: bool = True
                  ) -> list[FormProbeResult]:
-    """For each form: record input count, has_required, and (when applicable)
-    simulate empty submit and report focus behaviour.
-
-    When try_modal_triggers is True and no usable forms are found on initial
-    load, attempt to click likely modal-opening triggers (ARIA / data
-    attributes first, then text hints like 預約諮詢 / contact us) and re-probe
-    so that forms inside dialogs are also covered.
-    """
+    """Standalone: open own browser, navigate, probe. Used when no shared session."""
     from playwright.sync_api import sync_playwright
-    out: list[FormProbeResult] = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(user_agent=ua)
-        page = ctx.new_page()
         try:
+            ctx = browser.new_context(user_agent=ua)
+            page = ctx.new_page()
             page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
             try:
                 page.wait_for_load_state("networkidle", timeout=5000)
             except Exception:
                 pass
-            forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
-            if try_modal_triggers and not _has_usable_form(forms_meta):
-                _try_open_modal_forms(page, page_url)
-                forms_meta = page.evaluate(_FORM_SELECTORS_JS) or []
-            for meta in forms_meta[:max_forms]:
-                idx = meta["index"]
-                selector = meta["selector"]
-                has_req = meta["requiredCount"] > 0
-                input_count = int(meta.get("inputCount", 0))
-                if not has_req or not meta["hasSubmit"]:
-                    out.append(FormProbeResult(
-                        index=idx, selector=selector, has_required=has_req,
-                        submit_clicked=False, error_focus_jumped=False,
-                        focus_after_submit_tag="", focus_after_submit_selector="",
-                        input_count=input_count,
-                    ))
-                    continue
-                try:
-                    page.evaluate(f"""
-                        () => {{
-                            const f = document.querySelectorAll('form')[{idx}];
-                            if (!f) return;
-                            const sb = f.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
-                            if (sb) sb.click();
-                        }}
-                    """)
-                    page.wait_for_timeout(300)
-                    focus = page.evaluate(_FOCUS_AFTER_JS) or {}
-                    out.append(FormProbeResult(
-                        index=idx,
-                        selector=selector,
-                        has_required=True,
-                        submit_clicked=True,
-                        error_focus_jumped=bool(focus.get("isInvalidRequired")),
-                        focus_after_submit_tag=focus.get("tag", ""),
-                        focus_after_submit_selector=focus.get("selector", ""),
-                        input_count=input_count,
-                    ))
-                except Exception as e:
-                    out.append(FormProbeResult(
-                        index=idx, selector=selector, has_required=True,
-                        submit_clicked=False, error_focus_jumped=False,
-                        focus_after_submit_tag="", focus_after_submit_selector="",
-                        input_count=input_count,
-                        error=f"{type(e).__name__}: {e}",
-                    ))
+            return probe_forms_from_page(page, page_url, max_forms=max_forms,
+                                          try_modal_triggers=try_modal_triggers)
         finally:
             browser.close()
-    return out

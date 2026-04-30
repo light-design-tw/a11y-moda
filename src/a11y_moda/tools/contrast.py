@@ -183,20 +183,14 @@ def is_large_text(font_size_px: float, font_weight: int) -> bool:
     return False
 
 
-def collect_text_samples(page_url: str, *, ua: str = "Mozilla/5.0 a11y-moda") -> list[TextSample]:
-    from playwright.sync_api import sync_playwright
+def collect_text_samples_from_page(page) -> list[TextSample]:
+    """Run contrast sampling against an already-navigated Playwright page."""
     samples: list[TextSample] = []
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(user_agent=ua)
-        page = ctx.new_page()
-        page.goto(page_url, wait_until="networkidle", timeout=30000)
-        try:
-            page.evaluate(WARMUP_JS)  # scroll-warmup + font-ready
-        except Exception:
-            pass
-        raw = page.evaluate(SAMPLE_JS)
-        browser.close()
+    try:
+        page.evaluate(WARMUP_JS)  # scroll-warmup + font-ready
+    except Exception:
+        pass
+    raw = page.evaluate(SAMPLE_JS)
     for r in raw:
         fg_parsed = parse_css_color(r["fg"])
         bg_parsed = parse_css_color(r["bg"])
@@ -222,3 +216,17 @@ def collect_text_samples(page_url: str, *, ua: str = "Mozilla/5.0 a11y-moda") ->
             unmeasurable_reason=unmeas,
         ))
     return samples
+
+
+def collect_text_samples(page_url: str, *, ua: str = "Mozilla/5.0 a11y-moda") -> list[TextSample]:
+    """Standalone: open own browser, navigate, sample. Used when no shared session."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            ctx = browser.new_context(user_agent=ua)
+            page = ctx.new_page()
+            page.goto(page_url, wait_until="networkidle", timeout=30000)
+            return collect_text_samples_from_page(page)
+        finally:
+            browser.close()

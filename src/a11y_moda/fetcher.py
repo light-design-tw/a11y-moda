@@ -26,40 +26,51 @@ def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> t
         return report, None, ""
 
 
+def fetch_with_page(page, url: str, *, timeout_ms: int = 30000,
+                     wait_until: str = "domcontentloaded", capture_screenshot: bool = False
+                     ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
+    """Navigate an already-created Playwright page to URL; capture html + optional screenshots."""
+    report = PageReport(url=url)
+    full_png: bytes | None = None
+    viewport_png: bytes | None = None
+    try:
+        resp = page.goto(url, timeout=timeout_ms, wait_until=wait_until)
+        report.status_code = resp.status if resp else 0
+        try:
+            page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            pass
+        html = page.content()
+        if capture_screenshot:
+            viewport_png = page.screenshot(full_page=False, type="png")
+            full_png = page.screenshot(full_page=True, type="png")
+        soup = BeautifulSoup(html, "lxml")
+        return report, soup, html, full_png, viewport_png
+    except Exception as e:
+        report.fetch_error = f"{type(e).__name__}: {e}"
+        return report, None, "", None, None
+
+
 def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
                     wait_until: str = "domcontentloaded", capture_screenshot: bool = False
                     ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
-    """Fetch via headless Chromium; needed for SPA / JS-rendered pages.
-
-    Returns (report, soup, html, full_screenshot_png, viewport_screenshot_png).
-    Screenshot bytes are None unless capture_screenshot=True.
-    """
+    """Standalone: open own browser, navigate, capture. Used when no shared session."""
     report = PageReport(url=url)
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         report.fetch_error = "playwright not installed (pip install playwright && playwright install chromium)"
         return report, None, "", None, None
-    full_png: bytes | None = None
-    viewport_png: bytes | None = None
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(user_agent=ua, viewport={"width": 1280, "height": 800})
-            page = ctx.new_page()
-            resp = page.goto(url, timeout=timeout_ms, wait_until=wait_until)
-            report.status_code = resp.status if resp else 0
             try:
-                page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
-                pass  # tracker-heavy sites never reach idle; proceed with what we have
-            html = page.content()
-            if capture_screenshot:
-                viewport_png = page.screenshot(full_page=False, type="png")
-                full_png = page.screenshot(full_page=True, type="png")
-            browser.close()
-        soup = BeautifulSoup(html, "lxml")
-        return report, soup, html, full_png, viewport_png
+                ctx = browser.new_context(user_agent=ua, viewport={"width": 1280, "height": 800})
+                page = ctx.new_page()
+                return fetch_with_page(page, url, timeout_ms=timeout_ms,
+                                        wait_until=wait_until, capture_screenshot=capture_screenshot)
+            finally:
+                browser.close()
     except Exception as e:
         report.fetch_error = f"{type(e).__name__}: {e}"
         return report, None, "", None, None

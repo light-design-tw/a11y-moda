@@ -41,33 +41,43 @@ COLLECT_FOCUS_JS = r"""
 """
 
 
-def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str = "Mozilla/5.0 a11y-moda") -> list[FocusStop]:
-    from playwright.sync_api import sync_playwright
+def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
+    """Walk Tab order on an already-navigated Playwright page."""
     stops: list[FocusStop] = []
+    try:
+        page.evaluate("document.body.focus()")
+    except Exception:
+        pass
+    seen: set[str] = set()
+    for i in range(max_stops):
+        page.keyboard.press("Tab")
+        info = page.evaluate(COLLECT_FOCUS_JS)
+        if info is None:
+            break
+        key = f"{info['tag']}|{info['selector']}|{info['text']}"
+        if key in seen:
+            break
+        seen.add(key)
+        stops.append(FocusStop(
+            index=i,
+            tag=info["tag"],
+            selector=info["selector"],
+            text=info["text"],
+            has_visible_outline=bool(info["hasVisibleOutline"]),
+            in_viewport=bool(info["inViewport"]),
+        ))
+    return stops
+
+
+def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str = "Mozilla/5.0 a11y-moda") -> list[FocusStop]:
+    """Standalone: open own browser. Used when no shared session."""
+    from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(user_agent=ua)
-        page = ctx.new_page()
-        page.goto(page_url, wait_until="networkidle", timeout=30000)
-        page.evaluate("document.body.focus()")
-        seen: set[str] = set()
-        for i in range(max_stops):
-            page.keyboard.press("Tab")
-            info = page.evaluate(COLLECT_FOCUS_JS)
-            if info is None:
-                break
-            key = f"{info['tag']}|{info['selector']}|{info['text']}"
-            if key in seen:
-                # cycled back; stop
-                break
-            seen.add(key)
-            stops.append(FocusStop(
-                index=i,
-                tag=info["tag"],
-                selector=info["selector"],
-                text=info["text"],
-                has_visible_outline=bool(info["hasVisibleOutline"]),
-                in_viewport=bool(info["inViewport"]),
-            ))
-        browser.close()
-    return stops
+        try:
+            ctx = browser.new_context(user_agent=ua)
+            page = ctx.new_page()
+            page.goto(page_url, wait_until="networkidle", timeout=30000)
+            return walk_tab_stops_from_page(page, max_stops=max_stops)
+        finally:
+            browser.close()
