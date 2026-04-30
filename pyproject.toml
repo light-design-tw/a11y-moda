@@ -5,7 +5,7 @@ description = "Taiwan MODA accessibility (WCAG A/AA/AAA) scanner — CLI complem
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "睞特股份有限公司", email = "r910103n@gmail.com" },
+    { name = "睞特股份有限公司", email = "maple@light-design.com.tw" },
 ]
 keywords = ["accessibility", "wcag", "a11y", "moda", "taiwan", "freego", "audit", "scanner"]
 classifiers = [
