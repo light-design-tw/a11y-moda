@@ -16,6 +16,23 @@ LLM-assisted (OpenAI-compatible endpoint) for human-judgement rules (E codes). W
 - Vision-capable models can verify image / layout rules from screenshots.
 - Optional `--freego-compat` mode aligns reporting with the official MODA tool for cross-checking.
 
+## MODA AAA self-eval coverage (20/20)
+
+Implements every question on MODA's AAA self-evaluation form. The official tool covers **0** of these E (人工 / human-judgement) rules — submitters declare each one manually. We automate **18 / 20** end-to-end and surface the remaining **2** as informative caveats for human verification.
+
+Mechanism breakdown:
+
+| Mechanism | Count | Rules |
+|---|---|---|
+| **Pure DOM** (no external deps, ms-level) | 9 | Q2 GN1110111E (CAPTCHA alt) · Q3 GN3120600 (video detection + caveat) · Q6 AR3130600E (landmark) · Q7 HM1130110E (complex table) · Q8 GN1210101E (keyboard reachable) · Q10 GN1240100E (skip link) · Q13 HM3240800E (breadcrumb) · Q14 CS2141204E (em units) · Q18 HM2130500E (autocomplete) |
+| **LLM (text)** — OpenAI-compatible | 5 | Q1 HM1110103E (long alt) · Q4 HM1130104E (heading nesting) · Q5 GN2240600E (descriptive headings) · Q9 HM1240402E (image-link wording) · Q17 GN1330201E (required field labelling) |
+| **VLM (vision)** — multimodal | 1 | Q11 GN1240500E (sitemap detection from homepage screenshot) |
+| **Browser probe** (Playwright, no LLM) | 5 | Q12 CS2240700E (focus visible) · Q15 GN2140300E (AA contrast 4.5:1) · Q16 GN3140600E (AAA contrast 7:1) · Q19 GN3330602E (modal-aware form detection) · Q20 GN2330300E (empty submit → focus on first invalid required) |
+
+**70 % of the 20 rules run without any LLM/VLM call** — only 6 / 20 require external model access. Disable LLM and 14 rules still produce verdicts. LLM / VLM endpoints can point to a local model (Ollama, vLLM, LM Studio, qwen3-vl-8b, etc.) so request data never leaves your network.
+
+> Total registered rules across the package: **129** (covering Freego's machine-checked C rules plus extension E rules). The table above is the AAA self-eval subset.
+
 ## Install
 
 ```bash
