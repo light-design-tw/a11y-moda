@@ -1,7 +1,7 @@
 [project]
 name = "a11y-moda"
 version = "0.1.0"
-description = "Taiwan MODA accessibility (WCAG A/AA/AAA) scanner — CLI complement to Freego, LLM-assisted for human-judgement rules."
+description = "Unofficial CLI scanner for Taiwan MODA accessibility certification (WCAG A/AA/AAA). Complements Freego with CI-friendly automation; LLM-assisted for human-judgement rules."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -36,9 +36,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/r910103n/a11y-moda"
-Repository = "https://github.com/r910103n/a11y-moda"
-Issues = "https://github.com/r910103n/a11y-moda/issues"
+Homepage = "https://github.com/light-design-tw/a11y-moda"
+Repository = "https://github.com/light-design-tw/a11y-moda"
+Issues = "https://github.com/light-design-tw/a11y-moda/issues"
 
 [project.optional-dependencies]
 llm = ["anthropic>=0.40"]
