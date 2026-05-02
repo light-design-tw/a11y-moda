@@ -6,7 +6,7 @@ import httpx
 from .models import PageReport
 
 
-_DEFAULT_UA = "Mozilla/5.0 (compatible; a11y-moda/0.1; +https://github.com/)"
+from . import USER_AGENT as _DEFAULT_UA
 
 
 def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> tuple[PageReport, BeautifulSoup | None, str]:

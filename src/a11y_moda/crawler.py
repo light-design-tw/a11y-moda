@@ -9,6 +9,8 @@ from xml.etree import ElementTree as ET
 import httpx
 from bs4 import BeautifulSoup
 
+from . import USER_AGENT
+
 
 _SITEMAP_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 
@@ -106,7 +108,7 @@ def crawl(
     *,
     max_pages: int = 30,
     timeout: float = 15.0,
-    ua: str = "Mozilla/5.0 a11y-moda crawler",
+    ua: str = USER_AGENT,
     render: bool = False,
     exclude_urls: tuple[str, ...] = (),
     exclude_folders: tuple[str, ...] = (),

@@ -218,9 +218,11 @@ def collect_text_samples_from_page(page) -> list[TextSample]:
     return samples
 
 
-def collect_text_samples(page_url: str, *, ua: str = "Mozilla/5.0 a11y-moda") -> list[TextSample]:
+def collect_text_samples(page_url: str, *, ua: str | None = None) -> list[TextSample]:
     """Standalone: open own browser, navigate, sample. Used when no shared session."""
+    from .. import USER_AGENT
     from playwright.sync_api import sync_playwright
+    ua = ua or USER_AGENT
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:

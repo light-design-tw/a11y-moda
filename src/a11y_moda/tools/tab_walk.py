@@ -69,9 +69,11 @@ def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
     return stops
 
 
-def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str = "Mozilla/5.0 a11y-moda") -> list[FocusStop]:
+def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str | None = None) -> list[FocusStop]:
     """Standalone: open own browser. Used when no shared session."""
+    from .. import USER_AGENT
     from playwright.sync_api import sync_playwright
+    ua = ua or USER_AGENT
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:

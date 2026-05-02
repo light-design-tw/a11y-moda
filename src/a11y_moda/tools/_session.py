@@ -9,7 +9,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 
 
-_DEFAULT_UA = "Mozilla/5.0 (compatible; a11y-moda/0.1; +https://github.com/)"
+from .. import USER_AGENT as _DEFAULT_UA
 
 
 @contextmanager

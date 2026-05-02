@@ -257,10 +257,12 @@ def probe_forms_from_page(page, original_url: str, *, max_forms: int = 5,
 
 
 def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
-                 ua: str = "Mozilla/5.0 a11y-moda", try_modal_triggers: bool = True
+                 ua: str | None = None, try_modal_triggers: bool = True
                  ) -> list[FormProbeResult]:
     """Standalone: open own browser, navigate, probe. Used when no shared session."""
+    from .. import USER_AGENT
     from playwright.sync_api import sync_playwright
+    ua = ua or USER_AGENT
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         try:
