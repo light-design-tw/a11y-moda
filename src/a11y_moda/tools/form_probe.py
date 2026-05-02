@@ -260,20 +260,12 @@ def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
                  ua: str | None = None, try_modal_triggers: bool = True
                  ) -> list[FormProbeResult]:
     """Standalone: open own browser, navigate, probe. Used when no shared session."""
-    from .. import USER_AGENT
-    from playwright.sync_api import sync_playwright
-    ua = ua or USER_AGENT
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+    from ._session import standalone_page
+    with standalone_page(ua=ua) as page:
+        page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
         try:
-            ctx = browser.new_context(user_agent=ua)
-            page = ctx.new_page()
-            page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
-            try:
-                page.wait_for_load_state("networkidle", timeout=5000)
-            except Exception:
-                pass
-            return probe_forms_from_page(page, page_url, max_forms=max_forms,
-                                          try_modal_triggers=try_modal_triggers)
-        finally:
-            browser.close()
+            page.wait_for_load_state("networkidle", timeout=5000)
+        except Exception:
+            pass
+        return probe_forms_from_page(page, page_url, max_forms=max_forms,
+                                      try_modal_triggers=try_modal_triggers)

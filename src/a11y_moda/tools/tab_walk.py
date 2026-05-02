@@ -71,15 +71,7 @@ def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
 
 def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str | None = None) -> list[FocusStop]:
     """Standalone: open own browser. Used when no shared session."""
-    from .. import USER_AGENT
-    from playwright.sync_api import sync_playwright
-    ua = ua or USER_AGENT
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        try:
-            ctx = browser.new_context(user_agent=ua)
-            page = ctx.new_page()
-            page.goto(page_url, wait_until="networkidle", timeout=30000)
-            return walk_tab_stops_from_page(page, max_stops=max_stops)
-        finally:
-            browser.close()
+    from ._session import standalone_page
+    with standalone_page(ua=ua) as page:
+        page.goto(page_url, wait_until="networkidle", timeout=30000)
+        return walk_tab_stops_from_page(page, max_stops=max_stops)

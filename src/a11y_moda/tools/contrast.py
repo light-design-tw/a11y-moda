@@ -220,15 +220,7 @@ def collect_text_samples_from_page(page) -> list[TextSample]:
 
 def collect_text_samples(page_url: str, *, ua: str | None = None) -> list[TextSample]:
     """Standalone: open own browser, navigate, sample. Used when no shared session."""
-    from .. import USER_AGENT
-    from playwright.sync_api import sync_playwright
-    ua = ua or USER_AGENT
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        try:
-            ctx = browser.new_context(user_agent=ua)
-            page = ctx.new_page()
-            page.goto(page_url, wait_until="networkidle", timeout=30000)
-            return collect_text_samples_from_page(page)
-        finally:
-            browser.close()
+    from ._session import standalone_page
+    with standalone_page(ua=ua) as page:
+        page.goto(page_url, wait_until="networkidle", timeout=30000)
+        return collect_text_samples_from_page(page)

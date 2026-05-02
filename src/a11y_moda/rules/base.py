@@ -67,22 +67,21 @@ class Rule(ABC):
 _REGISTRY: list[type[Rule]] = []
 
 
-_LLM_MARKERS = ("ctx.llm", "judge_or_caveat", "judge_with_image", "from ..._lib.llm_", "from ..._lib.vision_rules")
+# Names imported into a rule module from `_lib/llm_*` or `_lib/vision_rules`
+# that signal the rule will issue an LLM/VLM call. Detected via vars(module)
+# rather than re-reading source from disk — faster and more accurate (won't
+# match commented-out examples).
+_LLM_IMPORT_MARKERS = (
+    "judge_or_caveat", "judge_with_image", "have_llm",          # _lib/llm_common
+    "_vision_judge", "_have_vision",                              # _lib/vision_rules
+)
 
 
 def register(cls: type[Rule]) -> type[Rule]:
-    """Register a rule. Auto-detect LLM use by inspecting the module source.
-
-    A rule is flagged uses_llm=True if its source imports any of the LLM helper
-    modules or calls ctx.llm / judge_or_caveat / judge_with_image directly.
-    Used by the scanner to fan LLM-bound rules out across worker threads while
-    keeping pure-DOM rules serial (they may share ctx.state).
-    """
-    try:
-        src = inspect.getsource(inspect.getmodule(cls))
-        cls.uses_llm = any(m in src for m in _LLM_MARKERS)
-    except (OSError, TypeError):
-        cls.uses_llm = False
+    """Register a rule. Auto-detect LLM use from imported names in module."""
+    mod = inspect.getmodule(cls)
+    mod_vars = vars(mod) if mod is not None else {}
+    cls.uses_llm = any(name in mod_vars for name in _LLM_IMPORT_MARKERS)
     _REGISTRY.append(cls)
     return cls
 

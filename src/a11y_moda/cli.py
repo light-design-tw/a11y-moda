@@ -22,6 +22,21 @@ def _build_llm(base_url: str | None, key: str | None, model: str | None) -> LLMC
     return LLMClient(cfg) if cfg else None
 
 
+def _llm_options(f):
+    """Apply the four `--llm-*` options to a Click command."""
+    f = click.option("--llm-concurrency", type=int, default=1,
+                     help="Per-page LLM rule concurrency. Default 1 (serial). Raise on endpoints "
+                          "that serve concurrent requests well (vLLM batched, OpenAI/Anthropic API). "
+                          "Local single-GPU models may degrade or OOM above 1.")(f)
+    f = click.option("--llm-model", default=None,
+                     help="Model name (falls back to A11Y_LLM_MODEL env)")(f)
+    f = click.option("--llm-key", default=None,
+                     help="API key (falls back to A11Y_LLM_KEY / OPENAI_API_KEY env)")(f)
+    f = click.option("--llm-base-url", default=None,
+                     help="OpenAI-compatible endpoint, e.g. https://api.openai.com/v1")(f)
+    return f
+
+
 def _serialize_page(report: PageReport) -> dict:
     return {
         "url": report.url,
@@ -81,13 +96,7 @@ def main() -> None:
 @click.option("--no-extension", is_flag=True, default=False,
               help="Alias for --freego-only")
 @click.option("--fail-only", is_flag=True, default=False, help="Show only fail issues")
-@click.option("--llm-base-url", default=None, help="OpenAI-compatible endpoint, e.g. https://api.openai.com/v1")
-@click.option("--llm-key", default=None, help="API key (falls back to A11Y_LLM_KEY / OPENAI_API_KEY env)")
-@click.option("--llm-model", default=None, help="Model name (falls back to A11Y_LLM_MODEL env)")
-@click.option("--llm-concurrency", type=int, default=1,
-              help="Per-page LLM rule concurrency. Default 1 (serial). Raise on endpoints that "
-                   "serve concurrent requests well (vLLM batched, OpenAI/Anthropic API). "
-                   "Local single-GPU models may degrade or OOM above 1.")
+@_llm_options
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")
 @click.option("--output", "-o", type=click.Path(), default=None,
               help="If extension is .md/.html, format auto-detected")
@@ -137,13 +146,7 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
 @click.option("--exclude-url", multiple=True, help="Exact URLs to skip (repeatable)")
 @click.option("--exclude-folder", multiple=True, help="URL substrings to skip e.g. /admin (repeatable)")
 @click.option("--max-time", type=float, default=0, help="Max scan duration in seconds (0 = unlimited)")
-@click.option("--llm-base-url", default=None, help="OpenAI-compatible endpoint")
-@click.option("--llm-key", default=None, help="API key (env fallback)")
-@click.option("--llm-model", default=None, help="Model name (env fallback)")
-@click.option("--llm-concurrency", type=int, default=1,
-              help="Per-page LLM rule concurrency. Default 1 (serial). Raise on endpoints that "
-                   "serve concurrent requests well (vLLM batched, OpenAI/Anthropic API). "
-                   "Local single-GPU models may degrade or OOM above 1.")
+@_llm_options
 @click.option("--group-by", type=click.Choice(["rule", "wcag", "url"]), default="rule",
               help="MD/JSON grouping (rule = most actionable; HTML always shows all 3 tabs)")
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")

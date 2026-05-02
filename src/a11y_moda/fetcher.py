@@ -57,20 +57,14 @@ def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
     """Standalone: open own browser, navigate, capture. Used when no shared session."""
     report = PageReport(url=url)
     try:
-        from playwright.sync_api import sync_playwright
+        from .tools._session import standalone_page
     except ImportError:
         report.fetch_error = "playwright not installed (pip install playwright && playwright install chromium)"
         return report, None, "", None, None
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            try:
-                ctx = browser.new_context(user_agent=ua, viewport={"width": 1280, "height": 800})
-                page = ctx.new_page()
-                return fetch_with_page(page, url, timeout_ms=timeout_ms,
-                                        wait_until=wait_until, capture_screenshot=capture_screenshot)
-            finally:
-                browser.close()
+        with standalone_page(ua=ua) as page:
+            return fetch_with_page(page, url, timeout_ms=timeout_ms,
+                                    wait_until=wait_until, capture_screenshot=capture_screenshot)
     except Exception as e:
         report.fetch_error = f"{type(e).__name__}: {e}"
         return report, None, "", None, None
