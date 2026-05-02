@@ -75,7 +75,10 @@ _FIND_STRUCTURAL_TRIGGERS_JS = r"""
             const idx = all.indexOf(el);
             if (idx < 0 || seen.has(idx)) return;
             seen.add(idx);
-            const text = (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 30);
+            // Combine all text-bearing attributes so destructive aria-label
+            // can't ride in via a benign innerText.
+            const text = [el.innerText, el.getAttribute('aria-label'), el.getAttribute('title'), el.value]
+                .filter(Boolean).join(' ').trim().slice(0, 60);
             out.push({ idx, tag: el.tagName.toLowerCase(), text, why: 'structural:' + sel });
         });
     });
@@ -99,17 +102,35 @@ _MODAL_TRIGGER_HINTS = (
 )
 
 
+# Never click candidates whose text contains these words — operating against
+# real production sites, a click could bill, charge, delete, or ship something.
+# Match is case-insensitive substring on innerText / aria-label.
+_DESTRUCTIVE_KEYWORDS = (
+    # zh-TW: payment / purchase / delete / cancel-account / confirm
+    "付款", "結帳", "下單", "購買", "購物車", "立即購買", "刪除", "移除",
+    "取消訂閱", "停用", "註銷", "註銷帳號", "刪除帳號", "登出", "確認送出",
+    "送出申請", "確認購買", "立即付款", "立即捐款", "捐款",
+    # en: payment / purchase / delete / unsubscribe / submit
+    "pay", "checkout", "buy now", "purchase", "order now", "place order",
+    "delete", "remove", "deactivate", "close account", "unsubscribe",
+    "donate", "logout", "log out", "sign out", "confirm purchase",
+)
+
+
 _FIND_TEXT_TRIGGERS_JS = r"""
 (hints) => {
     const out = [];
     const all = Array.from(document.querySelectorAll('button, a, [role="button"], [aria-haspopup], [data-bs-toggle], [data-toggle], [data-modal-target], [data-modal-trigger]'));
     all.forEach((el, i) => {
-        const text = (el.innerText || el.getAttribute('aria-label') || '').trim();
-        if (!text || text.length > 30) return;
+        // Combine all text-bearing attributes so destructive blacklist
+        // sees aria-label / title / value alongside innerText.
+        const text = [el.innerText, el.getAttribute('aria-label'), el.getAttribute('title'), el.value]
+            .filter(Boolean).join(' ').trim();
+        if (!text || text.length > 60) return;
         const lower = text.toLowerCase();
         for (const h of hints) {
             if (text.includes(h) || lower.includes(h.toLowerCase())) {
-                out.push({ idx: i, tag: el.tagName.toLowerCase(), text: text.slice(0, 30), why: 'text:' + h });
+                out.push({ idx: i, tag: el.tagName.toLowerCase(), text: text.slice(0, 60), why: 'text:' + h });
                 break;
             }
         }
@@ -158,20 +179,30 @@ def _has_usable_form(forms_meta: list) -> bool:
     return any(f.get("requiredCount", 0) > 0 and f.get("hasSubmit") for f in forms_meta)
 
 
+def _is_destructive(text: str) -> bool:
+    if not text:
+        return False
+    low = text.lower()
+    return any(kw in text or kw.lower() in low for kw in _DESTRUCTIVE_KEYWORDS)
+
+
 def _try_open_modal_forms(page, original_url: str, *, max_attempts: int = 3) -> None:
     """Try structural triggers first (ARIA / data attributes), then text hints.
     Click up to max_attempts candidates; revert if URL navigates away.
+    Skips any candidate whose visible text contains a destructive keyword
+    (purchase / delete / unsubscribe / etc.) — clicking those on production
+    sites can charge, ship, or destroy real data.
     """
     structural = page.evaluate(_FIND_STRUCTURAL_TRIGGERS_JS, list(_STRUCTURAL_TRIGGER_SELECTORS)) or []
     text_based = page.evaluate(_FIND_TEXT_TRIGGERS_JS, list(_MODAL_TRIGGER_HINTS)) or []
     seen_idx: set[int] = set()
     candidates: list[dict] = []
     for c in structural:
-        if c["idx"] not in seen_idx:
+        if c["idx"] not in seen_idx and not _is_destructive(c.get("text", "")):
             seen_idx.add(c["idx"])
             candidates.append(c)
     for c in text_based:
-        if c["idx"] not in seen_idx:
+        if c["idx"] not in seen_idx and not _is_destructive(c.get("text", "")):
             seen_idx.add(c["idx"])
             candidates.append(c)
 
@@ -200,7 +231,7 @@ def _try_open_modal_forms(page, original_url: str, *, max_attempts: int = 3) -> 
 
 
 def probe_forms_from_page(page, original_url: str, *, max_forms: int = 5,
-                           try_modal_triggers: bool = True) -> list[FormProbeResult]:
+                           try_modal_triggers: bool = False) -> list[FormProbeResult]:
     """Probe forms on an already-navigated Playwright page.
 
     Mutates page state (clicks modal triggers, submits forms) — caller should
@@ -257,7 +288,7 @@ def probe_forms_from_page(page, original_url: str, *, max_forms: int = 5,
 
 
 def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
-                 ua: str | None = None, try_modal_triggers: bool = True
+                 ua: str | None = None, try_modal_triggers: bool = False
                  ) -> list[FormProbeResult]:
     """Standalone: open own browser, navigate, probe. Used when no shared session."""
     from ._session import standalone_page

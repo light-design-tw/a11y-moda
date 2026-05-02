@@ -45,6 +45,7 @@ _HTML_TEMPLATE = """<!doctype html>
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
 <title>{title_html}</title>
 <style>
   :root {{ color-scheme: light dark; }}

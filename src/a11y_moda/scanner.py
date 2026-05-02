@@ -60,6 +60,7 @@ def scan_page(
     llm=None,
     browser=None,
     llm_workers: int = 1,
+    probe_modals: bool = False,
 ) -> PageReport:
     """Scan one URL.
 
@@ -76,7 +77,7 @@ def scan_page(
         return _scan_page_with_browser(url, browser=browser, level=level,
                                         freego_compat=freego_compat, ignore=ignore,
                                         sources=sources, llm=llm, capture_shots=capture_shots,
-                                        llm_workers=llm_workers)
+                                        llm_workers=llm_workers, probe_modals=probe_modals)
     # Standalone path — used for static scans and single-URL render scans.
     report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots)
     if soup is None:
@@ -92,7 +93,7 @@ def scan_page(
             from .tools.form_probe import probe_forms
             ctx.text_samples = collect_text_samples(url)
             ctx.tab_stops = walk_tab_stops(url)
-            ctx.form_sims = probe_forms(url)
+            ctx.form_sims = probe_forms(url, try_modal_triggers=probe_modals)
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
@@ -101,7 +102,7 @@ def scan_page(
     return report
 
 
-def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1) -> PageReport:
+def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1, probe_modals: bool = False) -> PageReport:
     """Render path using a shared browser. Fresh context per URL (incognito
     isolation), shared page across fetch + 3 probes (contrast/tab_walk/form).
     Form probe runs LAST because it mutates page state (clicks modal triggers).
@@ -123,7 +124,7 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
         try:
             ctx.text_samples = collect_text_samples_from_page(page)
             ctx.tab_stops = walk_tab_stops_from_page(page)
-            ctx.form_sims = probe_forms_from_page(page, url)
+            ctx.form_sims = probe_forms_from_page(page, url, try_modal_triggers=probe_modals)
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
@@ -146,6 +147,7 @@ def scan_urls(
     sources: set[str] | None = None,
     llm=None,
     llm_workers: int = 1,
+    probe_modals: bool = False,
 ) -> ScanReport:
     """Parallel scan of many URLs.
 
@@ -163,7 +165,8 @@ def scan_urls(
             time.sleep(delay)
         return scan_page(u, level=level, render=render,
                          freego_compat=freego_compat, ignore=ignore, sources=sources,
-                         llm=llm, browser=browser, llm_workers=llm_workers)
+                         llm=llm, browser=browser, llm_workers=llm_workers,
+                         probe_modals=probe_modals)
 
     if render:
         # Serial when rendering. Share one chromium across the whole site;

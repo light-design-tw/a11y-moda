@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import httpx
 
 from .models import PageReport
+from ._security import require_safe_http_url, UnsafeURLError
 
 
 from . import USER_AGENT as _DEFAULT_UA
@@ -12,8 +13,19 @@ from . import USER_AGENT as _DEFAULT_UA
 def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> tuple[PageReport, BeautifulSoup | None, str]:
     report = PageReport(url=url)
     try:
+        require_safe_http_url(url)
+    except UnsafeURLError as e:
+        report.fetch_error = str(e)
+        return report, None, ""
+    try:
         with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua}) as cli:
             r = cli.get(url)
+        # Re-validate after redirects — server may bounce us at internal hosts.
+        try:
+            require_safe_http_url(str(r.url))
+        except UnsafeURLError as e:
+            report.fetch_error = f"redirect to unsafe URL: {e}"
+            return report, None, ""
         report.status_code = r.status_code
         if r.status_code >= 400:
             report.fetch_error = f"HTTP {r.status_code}"
@@ -31,10 +43,21 @@ def fetch_with_page(page, url: str, *, timeout_ms: int = 30000,
                      ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
     """Navigate an already-created Playwright page to URL; capture html + optional screenshots."""
     report = PageReport(url=url)
+    try:
+        require_safe_http_url(url)
+    except UnsafeURLError as e:
+        report.fetch_error = str(e)
+        return report, None, "", None, None
     full_png: bytes | None = None
     viewport_png: bytes | None = None
     try:
         resp = page.goto(url, timeout=timeout_ms, wait_until=wait_until)
+        # Playwright may have followed redirects to file:// or a private host.
+        try:
+            require_safe_http_url(page.url)
+        except UnsafeURLError as e:
+            report.fetch_error = f"redirect to unsafe URL: {e}"
+            return report, None, "", None, None
         report.status_code = resp.status if resp else 0
         try:
             page.wait_for_load_state("networkidle", timeout=5000)

@@ -4,12 +4,16 @@ import asyncio
 import time
 from collections import deque
 from urllib.parse import urljoin, urlparse, urldefrag
-from xml.etree import ElementTree as ET
+
+# defusedxml hardens against billion-laughs / external-entity attacks in
+# untrusted sitemap.xml — drop-in replacement for stdlib xml.etree.
+from defusedxml import ElementTree as ET
 
 import httpx
 from bs4 import BeautifulSoup
 
 from . import USER_AGENT
+from ._security import is_safe_http_url
 
 
 _SITEMAP_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -47,7 +51,37 @@ def _is_excluded(url: str, *, exclude_urls: set[str], exclude_folders: tuple[str
         return True
     if any(folder and folder in url for folder in exclude_folders):
         return True
+    if not is_safe_http_url(url):  # SSRF guard — drop loopback / private / file://
+        return True
     return False
+
+
+# Hard caps on sitemap fetch & recursion. defusedxml stops billion-laughs but
+# nothing protects against 10GB sitemaps or sitemap-index cycles, so cap
+# response size, recursion depth, and URL count.
+_SITEMAP_MAX_BYTES = 25 * 1024 * 1024     # 25 MB per sitemap file
+_SITEMAP_MAX_DEPTH = 3                     # sitemap-index nesting
+_SITEMAP_MAX_URLS = 50_000                 # all sitemaps combined
+
+
+async def _fetch_with_cap(cli: httpx.AsyncClient, url: str, *, max_bytes: int) -> str | None:
+    """Stream-fetch a URL, abort if larger than max_bytes. Re-validates the
+    final URL after redirects so a sitemap can't redirect us at a private host.
+    """
+    try:
+        async with cli.stream("GET", url) as r:
+            if r.status_code != 200:
+                return None
+            if not is_safe_http_url(str(r.url)):
+                return None
+            buf = bytearray()
+            async for chunk in r.aiter_bytes():
+                buf.extend(chunk)
+                if len(buf) > max_bytes:
+                    return None
+            return buf.decode(r.encoding or "utf-8", errors="replace")
+    except Exception:
+        return None
 
 
 async def fetch_sitemap(base: str, *, timeout: float = 15.0) -> list[str]:
@@ -58,20 +92,20 @@ async def fetch_sitemap(base: str, *, timeout: float = 15.0) -> list[str]:
     urls: list[str] = []
     async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as cli:
         for c in candidates:
-            try:
-                r = await cli.get(c)
-            except Exception:
+            text = await _fetch_with_cap(cli, c, max_bytes=_SITEMAP_MAX_BYTES)
+            if not text or not text.strip().startswith("<"):
                 continue
-            if r.status_code != 200 or not r.text.strip().startswith("<"):
-                continue
-            urls.extend(await _parse_sitemap_xml(r.text, cli))
+            urls.extend(await _parse_sitemap_xml(text, cli, depth=0, visited={c}))
             if urls:
                 break
-    return [_normalize(u) for u in urls]
+    return [_normalize(u) for u in urls[:_SITEMAP_MAX_URLS]]
 
 
-async def _parse_sitemap_xml(xml_text: str, cli: httpx.AsyncClient) -> list[str]:
+async def _parse_sitemap_xml(xml_text: str, cli: httpx.AsyncClient,
+                              *, depth: int, visited: set[str]) -> list[str]:
     out: list[str] = []
+    if depth > _SITEMAP_MAX_DEPTH:
+        return out
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError:
@@ -79,16 +113,23 @@ async def _parse_sitemap_xml(xml_text: str, cli: httpx.AsyncClient) -> list[str]
     tag = root.tag.lower()
     if "sitemapindex" in tag:
         for sm in root.findall(".//sm:sitemap/sm:loc", _SITEMAP_NS):
-            try:
-                rr = await cli.get(sm.text.strip())
-                if rr.status_code == 200:
-                    out.extend(await _parse_sitemap_xml(rr.text, cli))
-            except Exception:
-                pass
+            sub_url = (sm.text or "").strip()
+            if not sub_url or sub_url in visited or not is_safe_http_url(sub_url):
+                continue
+            visited.add(sub_url)
+            sub_text = await _fetch_with_cap(cli, sub_url, max_bytes=_SITEMAP_MAX_BYTES)
+            if sub_text:
+                out.extend(await _parse_sitemap_xml(sub_text, cli, depth=depth + 1, visited=visited))
+                if len(out) >= _SITEMAP_MAX_URLS:
+                    return out[:_SITEMAP_MAX_URLS]
     else:
         for loc in root.findall(".//sm:url/sm:loc", _SITEMAP_NS):
             if loc.text:
-                out.append(loc.text.strip())
+                u = loc.text.strip()
+                if is_safe_http_url(u):
+                    out.append(u)
+                    if len(out) >= _SITEMAP_MAX_URLS:
+                        return out
     return out
 
 
@@ -138,6 +179,8 @@ def crawl(
                         page.wait_for_load_state("networkidle", timeout=5000)
                     except Exception:
                         pass
+                    if not is_safe_http_url(page.url):
+                        continue  # Playwright followed redirect to private/file:// host
                     html = page.content()
                 except Exception:
                     continue
@@ -154,6 +197,9 @@ def crawl(
             try:
                 r = cli.get(url)
             except Exception:
+                continue
+            # SSRF guard after redirect — server may bounce us at a private host.
+            if not is_safe_http_url(str(r.url)):
                 continue
             if r.status_code >= 400 or "html" not in r.headers.get("content-type", "").lower():
                 continue

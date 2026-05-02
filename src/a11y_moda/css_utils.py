@@ -12,6 +12,8 @@ import httpx
 import tinycss2
 from bs4 import BeautifulSoup, Tag
 
+from ._security import is_safe_http_url
+
 
 @dataclass
 class Declaration:
@@ -20,16 +22,29 @@ class Declaration:
     source: str  # "<style>", "style@", or url
 
 
+_STYLESHEET_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per stylesheet — stops a hostile origin pinning hundreds of MB in lru_cache.
+
+
 @lru_cache(maxsize=128)
 def _fetch(url: str) -> str:
+    # SSRF guard: a hostile page can plant <link rel="stylesheet"
+    # href="http://127.0.0.1:9200/_cluster/state"> to make us pull
+    # internal services. Validate before AND after redirects.
+    if not is_safe_http_url(url):
+        return ""
     try:
         with httpx.Client(follow_redirects=True, timeout=10.0) as cli:
-            r = cli.get(url)
-        if r.status_code == 200:
-            return r.text
+            with cli.stream("GET", url) as r:
+                if r.status_code != 200 or not is_safe_http_url(str(r.url)):
+                    return ""
+                buf = bytearray()
+                for chunk in r.iter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > _STYLESHEET_MAX_BYTES:
+                        return ""
+                return buf.decode(r.encoding or "utf-8", errors="replace")
     except Exception:
-        pass
-    return ""
+        return ""
 
 
 def _walk_rules(nodes, source: str) -> list[Declaration]:
