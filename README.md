@@ -1,60 +1,62 @@
 # a11y-moda
 
-Python CLI for **Taiwan MODA accessibility certification** (無障礙標章 A / AA / AAA).
+> 台灣 MODA 無障礙標章送審用的 Python CLI · WCAG A / AA / AAA · zh-TW 報告
 
-> ⚠️ **Unofficial / community tool.** Not affiliated with, endorsed by, or sponsored by Taiwan's Ministry of Digital Affairs (MODA / 數位發展部). Results are for developer convenience and do not replace official MODA review. The official tool is **[Freego](https://accessibility.moda.gov.tw/)**.
->
-> 本工具為**非官方**社群開源專案，與數位發展部 (MODA) 無從屬關係，不替代官方 Freego 與正式審查流程。
+**繁體中文** · [English](./README.en.md)
 
-The official tool — [Freego](https://accessibility.moda.gov.tw/) — is a Java GUI without CLI, Docker, or API support. `a11y-moda` is a CLI complement designed for **CI/CD pipelines** and **AI-assisted scanning workflows**. It implements MODA's published accessibility rule codes (HM / GN / CS / AR / FA / SC) and maps each finding to the corresponding MODA rule ID and WCAG 2.1 success criterion.
+> ⚠️ **非官方社群工具。** 與數位發展部 (MODA / 數位發展部) 無從屬關係，不替代官方 [Freego](https://accessibility.moda.gov.tw/) 與正式審查流程。本工具僅為開發者便利之用。
 
-LLM-assisted (OpenAI-compatible endpoint) for human-judgement rules (E codes). Works with OpenAI, Anthropic, OpenRouter, Ollama, vLLM, LM Studio, llama.cpp server — anything exposing `/v1/chat/completions`.
+## 為什麼做這個
 
-## Features
+MODA 官方工具 [Freego](https://accessibility.moda.gov.tw/) 是 Java GUI，沒有 CLI、Docker、API 介面。`a11y-moda` 補這個缺口，給 **CI/CD pipeline** 跟 **AI 協作開發** 用。實作 MODA 公布的規則編碼 (HM / GN / CS / AR / FA / SC)，每筆 issue 標注對應 MODA rule_id 跟 WCAG 2.1 success criterion。
 
-- Static scan (httpx + BeautifulSoup) or rendered scan (Playwright / headless Chromium) for SPAs.
-- A / AA / AAA level filtering.
-- Site crawl: sitemap.xml first, BFS fallback.
-- Output: JSON / Markdown / HTML (HTML always renders by-rule, by-WCAG, by-URL views).
-- LLM judge cache on disk — safe to re-run, only changed rules re-call the model.
-- Vision-capable models can verify image / layout rules from screenshots.
-- Optional `--freego-compat` mode aligns reporting with the official MODA tool for cross-checking.
+人工判斷類規則 (E codes) 接 OpenAI 相容 API。OpenAI、Anthropic、OpenRouter、Ollama、vLLM、LM Studio、llama.cpp server — 任何吐 `/v1/chat/completions` 的端點都接得起來。
 
-## MODA AAA self-eval coverage (20/20)
+## 功能
 
-Implements every question on MODA's AAA self-evaluation form. The official tool covers **0** of these E (人工 / human-judgement) rules — submitters declare each one manually. We automate **18 / 20** end-to-end and surface the remaining **2** as informative caveats for human verification.
+- 靜態掃描 (httpx + BeautifulSoup) 或渲染掃描 (Playwright / headless Chromium，給 SPA 用)
+- A / AA / AAA 等級過濾
+- 全站爬取：先 sitemap.xml，找不到就 BFS
+- 輸出：JSON / Markdown / HTML (HTML 一律渲染依規則 / 依 WCAG / 依 URL 三種 view)
+- LLM 判斷結果存本地 cache — 重跑安全，只有改動的規則重打模型
+- 視覺模型 (VLM) 從截圖驗證版面 / 圖片類規則
+- `--freego-compat` 對齊官方工具回報格式，便於交叉比對
 
-Mechanism breakdown:
+## MODA AAA 自評涵蓋率 (20/20)
 
-| Mechanism | Count | Rules |
+實作 MODA AAA 自評表全部 20 題。官方工具對這些 E (人工判斷) 規則的覆蓋率是 **0** — 送件人要逐題手動勾選。本工具自動化 **18 / 20**，剩下 **2** 以 informative caveat 標記，提供人工複查線索。
+
+機制拆解：
+
+| 機制 | 數量 | 規則 |
 |---|---|---|
-| **Pure DOM** (no external deps, ms-level) | 9 | Q2 GN1110111E (CAPTCHA alt) · Q3 GN3120600 (video detection + caveat) · Q6 AR3130600E (landmark) · Q7 HM1130110E (complex table) · Q8 GN1210101E (keyboard reachable) · Q10 GN1240100E (skip link) · Q13 HM3240800E (breadcrumb) · Q14 CS2141204E (em units) · Q18 HM2130500E (autocomplete) |
-| **LLM (text)** — OpenAI-compatible | 5 | Q1 HM1110103E (long alt) · Q4 HM1130104E (heading nesting) · Q5 GN2240600E (descriptive headings) · Q9 HM1240402E (image-link wording) · Q17 GN1330201E (required field labelling) |
-| **VLM (vision)** — multimodal | 1 | Q11 GN1240500E (sitemap detection from homepage screenshot) |
-| **Browser probe** (Playwright, no LLM) | 5 | Q12 CS2240700E (focus visible) · Q15 GN2140300E (AA contrast 4.5:1) · Q16 GN3140600E (AAA contrast 7:1) · Q19 GN3330602E (modal-aware form detection) · Q20 GN2330300E (empty submit → focus on first invalid required) |
+| **純 DOM** (無外部依賴，毫秒級) | 9 | Q2 GN1110111E (CAPTCHA alt) · Q3 GN3120600 (影片偵測 + caveat) · Q6 AR3130600E (landmark) · Q7 HM1130110E (複雜表格) · Q8 GN1210101E (鍵盤可達) · Q10 GN1240100E (skip link) · Q13 HM3240800E (麵包屑) · Q14 CS2141204E (em 單位) · Q18 HM2130500E (autocomplete) |
+| **LLM (文字)** — OpenAI 相容 | 5 | Q1 HM1110103E (長文 alt) · Q4 HM1130104E (標題巢狀) · Q5 GN2240600E (描述性標題) · Q9 HM1240402E (圖連結文字) · Q17 GN1330201E (必填欄位標示) |
+| **VLM (視覺)** — 多模態 | 1 | Q11 GN1240500E (從首頁截圖偵測網站地圖) |
+| **瀏覽器 probe** (Playwright，無 LLM) | 5 | Q12 CS2240700E (focus visible) · Q15 GN2140300E (AA 對比 4.5:1) · Q16 GN3140600E (AAA 對比 7:1) · Q19 GN3330602E (modal-aware 表單偵測) · Q20 GN2330300E (空送出 → focus 第一個必填無效欄位) |
 
-**70 % of the 20 rules run without any LLM/VLM call** — only 6 / 20 require external model access. Disable LLM and 14 rules still produce verdicts. LLM / VLM endpoints can point to a local model (Ollama, vLLM, LM Studio, qwen3-vl-8b, etc.) so request data never leaves your network.
+**20 條中 70% 不需要任何 LLM/VLM 呼叫** — 只有 6/20 需要外部模型。LLM 全關，14 條規則照樣有判斷結果。LLM / VLM 端點可指向本地模型 (Ollama, vLLM, LM Studio, qwen3-vl-8b 等)，request 不離開內網。
 
-> Total registered rules across the package: **129** (covering Freego's machine-checked C rules plus extension E rules). The table above is the AAA self-eval subset.
+> 套件總註冊規則數：**129** (涵蓋 Freego 的 C 類機器檢查 + 我們補的 E 類擴充規則)。上表只是 AAA 自評子集。
 
-## Install
+## 安裝
 
 ```bash
 pip install -e .
-playwright install chromium    # required for --render and Playwright-based probes
+playwright install chromium    # --render 跟 Playwright probe 都要這個
 ```
 
-Python ≥ 3.10.
+Python ≥ 3.10。
 
-## Quick start
+## 快速開始
 
-Scan one URL:
+掃單一 URL：
 
 ```bash
 a11y-moda scan https://example.com --level AA
 ```
 
-Crawl + scan a whole site, render JS, use a local VLM, write HTML report:
+爬取整站 + 渲染 JS + 用本地 VLM + 輸出 HTML 報告：
 
 ```bash
 a11y-moda site https://example.com \
@@ -63,7 +65,7 @@ a11y-moda site https://example.com \
   --format html -o report.html
 ```
 
-LLM endpoint via env (used when `--llm-*` flags omitted):
+LLM endpoint 用環境變數 (沒給 `--llm-*` flag 時 fallback)：
 
 ```bash
 export A11Y_LLM_BASE_URL=https://api.openai.com/v1
@@ -71,34 +73,34 @@ export A11Y_LLM_KEY=sk-...
 export A11Y_LLM_MODEL=gpt-4o-mini
 ```
 
-## Command reference
+## 指令參考
 
 ```
-a11y-moda scan <URL>     scan a single page
-a11y-moda site <URL>     discover and scan a whole site
+a11y-moda scan <URL>     掃單頁
+a11y-moda site <URL>     探索並掃整站
 ```
 
-Common options:
+常用選項：
 
-| Flag | Default | Note |
+| Flag | 預設 | 說明 |
 |---|---|---|
-| `--level A\|AA\|AAA` | `AA` | scan level |
-| `--render` | off | use headless Chromium for JS-rendered pages |
-| `--max-pages N` | 30 | upper bound for `site` |
-| `--source sitemap\|crawl\|auto` | `auto` | URL discovery strategy |
-| `--workers N` | 4 | parallel workers (static scans only; render is serial) |
-| `--rps N` | 0 | global rate cap (req/s); 0 = unlimited |
-| `--ignore RULE_ID` | — | repeatable; skip specific rule IDs |
-| `--freego-only` | off | only rules covered by the official tool's machine checks |
-| `--freego-compat` | off | match the official tool's reporting for CS2140401C / CS3140801C / CS3140802C |
-| `--format json\|md\|html` | `json` | output format (also auto-detected from `-o` extension) |
-| `-o FILE` | stdout | bare filename → `./reports/FILE` |
+| `--level A\|AA\|AAA` | `AA` | 掃描等級 |
+| `--render` | off | 用 headless Chromium 渲染 JS 頁面 |
+| `--max-pages N` | 30 | `site` 上限 |
+| `--source sitemap\|crawl\|auto` | `auto` | URL 探索策略 |
+| `--workers N` | 4 | 並行 worker (僅靜態掃描；render 強制序列化) |
+| `--rps N` | 0 | 全域速率上限 (req/s)，0 = 不限 |
+| `--ignore RULE_ID` | — | 可重複；跳過指定 rule_id |
+| `--freego-only` | off | 只跑官方工具有的機器檢查規則 |
+| `--freego-compat` | off | 對齊官方工具回報 (CS2140401C / CS3140801C / CS3140802C) |
+| `--format json\|md\|html` | `json` | 輸出格式 (也會從 `-o` 副檔名自動判斷) |
+| `-o FILE` | stdout | 純檔名 → `./reports/FILE` |
 
-## How rules work
+## 規則怎麼運作
 
-Each MODA rule_id is one Python file under `src/a11y_moda/rules/codes/<theme>/<RULE_ID>.py`. The package auto-discovers every rule via `pkgutil.iter_modules` — registration is automatic via the `@register` decorator.
+每個 MODA rule_id 一個 Python 檔，放 `src/a11y_moda/rules/codes/<主題>/<RULE_ID>.py`。套件用 `pkgutil.iter_modules` 自動探索；用 `@register` decorator 自動註冊，不用改清單。
 
-Skeleton:
+樣板：
 
 ```python
 from ....models import Level
@@ -114,12 +116,12 @@ class MyRule(Rule):
         report.add(self._issue(message="...", snippet="...", status="fail"))
 ```
 
-`source = "freego"` → rule covered by the official MODA tool's machine checks.
-`source = "extension"` → an E (人工 / manual) rule we automated programmatically.
+`source = "freego"` → 對應官方工具有的機器檢查規則
+`source = "extension"` → E (人工判斷) 規則被我們程式化的版本
 
-## Project status
+## 專案狀態
 
-Pre-1.0. Rule coverage tracked against MODA's published rule set; LLM-assisted rules require external LLM access. Output schema may change before 1.0.
+Pre-1.0。規則覆蓋率對齊 MODA 公布的規則集；LLM 類規則需外部 LLM 接取。1.0 前輸出 schema 可能會變動。
 
 ## License
 
