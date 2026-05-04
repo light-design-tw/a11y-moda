@@ -1,7 +1,7 @@
 [project]
 name = "a11y-moda"
 version = "0.1.0"
-description = "Unofficial CLI scanner for Taiwan MODA accessibility certification (WCAG A/AA/AAA). Complements Freego with CI-friendly automation; LLM-assisted for human-judgement rules."
+description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Natural Language :: Chinese (Traditional)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
