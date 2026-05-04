@@ -31,11 +31,18 @@ class HeadingNestingMakesSense(Rule):
         if len(headings) < 2:
             return
         max_seen = 0
+        prev_lvl = 0
+        prev_text = ""
         for lvl, text in headings:
             if max_seen and lvl > max_seen + 1:
+                jump = lvl - prev_lvl
                 report.add(self._issue(
-                    message=f"標題層次跳級：上一層為 h{max_seen}，但下一個是 h{lvl}（跳過 h{max_seen+1}）",
-                    snippet=f"...h{max_seen} → h{lvl}: {text}", status="info"))
+                    message=(f"標題層次跳級：h{lvl}「{text}」前最近的 heading 是 h{prev_lvl}「{prev_text}」，"
+                             f"跳 {jump} 級（建議改為 h{prev_lvl+1}）。整份文件最深見過 h{max_seen}。"),
+                    snippet=f"...h{prev_lvl}「{prev_text}」 → h{lvl}「{text}」",
+                    status="info"))
                 return
             if lvl > max_seen:
                 max_seen = lvl
+            prev_lvl = lvl
+            prev_text = text

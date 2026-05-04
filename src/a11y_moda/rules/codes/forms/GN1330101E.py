@@ -25,19 +25,41 @@ class FormatErrorMessage(Rule):
 {OUTPUT_INSTRUCTIONS}"""
 
     _FMT_HINT = re.compile(r"(format|invalid|格式|錯誤|無效|請以)", re.IGNORECASE)
+    _ERROR_CLASS_HINT = re.compile(
+        r"(error|invalid-feedback|help-text|form-error|field-error|errorMessage|hint)",
+        re.IGNORECASE,
+    )
 
     def _check(self, soup, report, *, html, url, ctx) -> None:
         if not have_llm(ctx):
             return
+        # No <form> on the page → nothing to judge. Stops blog body text containing
+        # 「格式」「錯誤」 from being treated as form error messages.
+        forms = soup.find_all("form")
+        if not forms:
+            return
         msgs = []
-        for el in soup.find_all(True):
-            if not isinstance(el, Tag) or should_skip(el):
-                continue
-            cls = " ".join(el.get("class") or [])
-            text = el.get_text(" ", strip=True)
-            if self._FMT_HINT.search(cls) or self._FMT_HINT.search(text[:60]):
-                if 5 < len(text) < 200:
+        for form in forms:
+            for el in form.find_all(True):
+                if not isinstance(el, Tag) or should_skip(el):
+                    continue
+                cls = " ".join(el.get("class") or [])
+                # Must look like an error-message container, not arbitrary content.
+                role = (el.get("role") or "").lower()
+                aria_live = (el.get("aria-live") or "").lower()
+                is_error_slot = (
+                    role in {"alert", "status"}
+                    or aria_live in {"polite", "assertive"}
+                    or self._ERROR_CLASS_HINT.search(cls)
+                    or el.name == "output"
+                )
+                if not is_error_slot:
+                    continue
+                text = el.get_text(" ", strip=True)
+                if 5 < len(text) < 200 and self._FMT_HINT.search(text[:60]):
                     msgs.append(text)
+                if len(msgs) >= 5:
+                    break
             if len(msgs) >= 5:
                 break
         if not msgs:
