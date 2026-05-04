@@ -61,6 +61,7 @@ def scan_page(
     browser=None,
     llm_workers: int = 1,
     probe_modals: bool = False,
+    strict_third_party: bool = False,
 ) -> PageReport:
     """Scan one URL.
 
@@ -77,7 +78,8 @@ def scan_page(
         return _scan_page_with_browser(url, browser=browser, level=level,
                                         freego_compat=freego_compat, ignore=ignore,
                                         sources=sources, llm=llm, capture_shots=capture_shots,
-                                        llm_workers=llm_workers, probe_modals=probe_modals)
+                                        llm_workers=llm_workers, probe_modals=probe_modals,
+                                        strict_third_party=strict_third_party)
     # Standalone path — used for static scans and single-URL render scans.
     report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots)
     if soup is None:
@@ -86,6 +88,8 @@ def scan_page(
                       full_screenshot=full_png, viewport_screenshot=vp_png)
     if level == Level.AAA:
         ctx.state["strict_aaa"] = True
+    if strict_third_party:
+        ctx.state["strict_third_party"] = True
     if render:
         try:
             from .tools.contrast import collect_text_samples
@@ -102,7 +106,7 @@ def scan_page(
     return report
 
 
-def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1, probe_modals: bool = False) -> PageReport:
+def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1, probe_modals: bool = False, strict_third_party: bool = False) -> PageReport:
     """Render path using a shared browser. Fresh context per URL (incognito
     isolation), shared page across fetch + 3 probes (contrast/tab_walk/form).
     Form probe runs LAST because it mutates page state (clicks modal triggers).
@@ -121,6 +125,8 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
                           full_screenshot=full_png, viewport_screenshot=vp_png)
         if level == Level.AAA:
             ctx.state["strict_aaa"] = True
+        if strict_third_party:
+            ctx.state["strict_third_party"] = True
         try:
             ctx.text_samples = collect_text_samples_from_page(page)
             ctx.tab_stops = walk_tab_stops_from_page(page)
@@ -148,6 +154,7 @@ def scan_urls(
     llm=None,
     llm_workers: int = 1,
     probe_modals: bool = False,
+    strict_third_party: bool = False,
 ) -> ScanReport:
     """Parallel scan of many URLs.
 
@@ -166,7 +173,8 @@ def scan_urls(
         return scan_page(u, level=level, render=render,
                          freego_compat=freego_compat, ignore=ignore, sources=sources,
                          llm=llm, browser=browser, llm_workers=llm_workers,
-                         probe_modals=probe_modals)
+                         probe_modals=probe_modals,
+                         strict_third_party=strict_third_party)
 
     if render:
         # Serial when rendering. Share one chromium across the whole site;

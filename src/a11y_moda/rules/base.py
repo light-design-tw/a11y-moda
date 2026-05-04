@@ -44,10 +44,29 @@ class Rule(ABC):
             ctx = RuleContext()
         if self.meta.rule_id in ctx.ignore:
             return
+        before = len(report.issues)
         try:
             self._check(soup, report, html=html, url=url, ctx=ctx)
         except Exception as e:
             report.add(self._issue(message=f"檢測發生異常：{type(e).__name__}: {e}", status="caveat"))
+        # Downgrade issues whose violation lives in a third-party resource
+        # (different root domain). User can opt out via --strict-third-party
+        # or --freego-compat (Freego doesn't distinguish third-party).
+        if not ctx.state.get("strict_third_party") and not ctx.freego_compat and url:
+            from ._lib.origin import extract_resource_url, is_third_party, third_party_origin
+            for issue in report.issues[before:]:
+                if issue.status != "fail":
+                    continue
+                res_url = extract_resource_url(issue.snippet)
+                if not res_url or not is_third_party(res_url, url):
+                    continue
+                origin = third_party_origin(res_url)
+                issue.status = "caveat"
+                issue.message = (
+                    f"[third-party: {origin}] {issue.message} "
+                    f"註：此違規來自第三方資源，需於申請時備註欄聲明 "
+                    f"(參 WCAG 2.1 §5.4 Partial Conformance)。"
+                )
 
     @abstractmethod
     def _check(self, soup: BeautifulSoup, report: PageReport, *, html: str, url: str, ctx: RuleContext) -> None: ...

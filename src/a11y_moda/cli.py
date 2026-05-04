@@ -151,6 +151,11 @@ def main(ctx: click.Context, env_file: str | None) -> None:
                    "forms inside dialogs. OFF by default — clicking on production sites can "
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
+@click.option("--strict-third-party", is_flag=True, default=False,
+              help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
+                   "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
+                   "site author cannot fix external resources directly (WCAG 2.1 §5.4 "
+                   "Partial Conformance route applies).")
 @_llm_options
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")
 @click.option("--output", "-o", type=click.Path(), default=None,
@@ -158,6 +163,7 @@ def main(ctx: click.Context, env_file: str | None) -> None:
 def scan(url: str, level: str, render: bool, freego_compat: bool,
          ignore: tuple[str, ...], freego_only: bool, no_extension: bool,
          fail_only: bool, allow_private_hosts: bool, probe_modals: bool,
+         strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          fmt: str, output: str | None) -> None:
@@ -167,7 +173,8 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
     llm = _build_llm(llm_base_url, llm_key, llm_model)
     report = scan_page(url, level=Level[level], render=render,
                        freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
-                       llm_workers=llm_concurrency, probe_modals=probe_modals)
+                       llm_workers=llm_concurrency, probe_modals=probe_modals,
+                       strict_third_party=strict_third_party)
     if fail_only:
         report.issues = [i for i in report.issues if i.status == "fail"]
     fmt = _resolve_fmt(fmt, output)
@@ -211,6 +218,11 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
                    "forms inside dialogs. OFF by default — clicking on production sites can "
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
+@click.option("--strict-third-party", is_flag=True, default=False,
+              help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
+                   "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
+                   "site author cannot fix external resources directly (WCAG 2.1 §5.4 "
+                   "Partial Conformance route applies).")
 @_llm_options
 @click.option("--group-by", type=click.Choice(["rule", "wcag", "url"]), default="rule",
               help="MD/JSON grouping (rule = most actionable; HTML always shows all 3 tabs)")
@@ -223,6 +235,7 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          source: str, workers: int, delay: float, rps: float,
          render_crawl: bool, exclude_url: tuple[str, ...], exclude_folder: tuple[str, ...],
          max_time: float, allow_private_hosts: bool, probe_modals: bool,
+         strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          group_by: str, fmt: str, output: str | None) -> None:
@@ -250,7 +263,8 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
                             freego_compat=freego_compat, ignore=ignore,
                             workers=workers, progress=True, delay=delay, rps=rps,
                             sources=sources, llm=llm, llm_workers=llm_concurrency,
-                            probe_modals=probe_modals)
+                            probe_modals=probe_modals,
+                            strict_third_party=strict_third_party)
     if llm:
         print(f"LLM stats: {llm.stats}", file=sys.stderr)
     if fail_only:
