@@ -1,6 +1,6 @@
 # a11y-moda
 
-> 台灣 MODA 無障礙標章送審用的 Python CLI · WCAG A / AA / AAA · zh-TW 報告
+> 台灣 MODA 無障礙標章自評用 Python CLI · WCAG A / AA / AAA · zh-TW 報告
 
 **繁體中文** · [English](./README.en.md)
 
