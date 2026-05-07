@@ -23,6 +23,32 @@ from ...helpers import (
 )
 
 
+# Decorative-image markers: when present alongside alt="", the dev has
+# explicitly told assistive tech "skip me". We trust the explicit signal
+# and don't emit a "verify decorative intent" info — that would be noise.
+_DECORATIVE_ROLES = {"presentation", "none"}
+
+
+def _is_explicitly_decorative_jsx(img) -> bool:
+    role = get_attr(img, "role")
+    if role.kind == "literal" and role.value and role.value.lower() in _DECORATIVE_ROLES:
+        return True
+    aria_hidden = get_attr(img, "aria-hidden")
+    if aria_hidden.kind == "literal" and aria_hidden.value and aria_hidden.value.lower() == "true":
+        return True
+    return False
+
+
+def _is_explicitly_decorative_html(img) -> bool:
+    role = get_html_attr(img, "role")
+    if role.kind == "literal" and role.value and role.value.lower() in _DECORATIVE_ROLES:
+        return True
+    aria_hidden = get_html_attr(img, "aria-hidden")
+    if aria_hidden.kind == "literal" and aria_hidden.value and aria_hidden.value.lower() == "true":
+        return True
+    return False
+
+
 @register
 class ImgAltLint(LintRule):
     meta = RuleMeta(
@@ -71,6 +97,11 @@ class ImgAltLint(LintRule):
                     node=img,
                 )
             elif attr.kind == "empty":
+                # Trust explicit decorative markers (role="presentation"/"none"
+                # or aria-hidden="true"). When dev has triple-flagged the image
+                # as decorative, our generic "verify intent" info is noise.
+                if _is_explicitly_decorative_jsx(img):
+                    continue
                 yield self._issue(
                     status="info",
                     message="<img> alt 為空字串 — 若為純裝飾性圖片正確；若為內容圖請補敘述",
@@ -88,6 +119,8 @@ class ImgAltLint(LintRule):
                     node=img,
                 )
             elif attr.kind == "empty":
+                if _is_explicitly_decorative_html(img):
+                    continue
                 yield self._issue(
                     status="info",
                     message="<img> alt 為空字串 — 若為純裝飾性圖片正確；若為內容圖請補敘述",

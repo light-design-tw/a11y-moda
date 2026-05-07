@@ -11,7 +11,7 @@ from typing import Iterable
 from ....models import Level
 from ....rules.base import RuleMeta
 from ...base import LintRule, LintIssue, register
-from ...helpers import find_jsx_elements, find_html_elements
+from ...helpers import find_jsx_elements, find_html_elements, has_spread_props
 
 
 def _first_jsx_child_element(jsx_element):
@@ -96,20 +96,37 @@ class FieldsetLegendLint(LintRule):
 
         # JSX path
         for fs in find_jsx_elements(parsed.tree, "fieldset"):
-            # Look at the parent container (jsx_element wraps opening + body + closing).
-            parent = fs.parent if fs.type == "jsx_opening_element" else fs
+            # Self-closing form: <fieldset /> or <fieldset {...props} />.
+            # Has no body content at all. If it has spread, this is most
+            # likely a wrapper component re-exporting fieldset; we can't
+            # tell from this file. Skip silently — the responsibility lies
+            # with the consumer who instantiates the wrapper.
+            if fs.type == "jsx_self_closing_element":
+                if has_spread_props(fs):
+                    continue
+                yield self._issue(status="fail",
+                    message="<fieldset /> 為空 — 不應作純視覺用途",
+                    node=fs)
+                continue
+
+            # Paired form: <fieldset>...</fieldset>. Look at body children.
+            parent = fs.parent
             first, saw_dynamic = _first_jsx_child_element(parent)
             if first is None:
+                # No static element child. If we saw dynamic (`{children}`,
+                # `{x && <y/>}`) the children come from outside this file —
+                # this is a wrapper component pattern (Radix/Shadcn/HeadlessUI
+                # all use it). Responsibility shifts to consumer. Skip.
                 if saw_dynamic:
-                    yield self._issue(status="caveat",
-                        message="<fieldset> 子元素為動態表達式 — 無法靜態驗證 <legend> 結構",
-                        node=fs)
-                else:
-                    yield self._issue(status="fail",
-                        message="<fieldset> 為空 — 不應作純視覺用途",
-                        node=fs)
+                    continue
+                # Truly empty — <fieldset></fieldset>.
+                yield self._issue(status="fail",
+                    message="<fieldset> 為空 — 不應作純視覺用途",
+                    node=fs)
                 continue
             if saw_dynamic:
+                # Dynamic expression precedes the first element child.
+                # Order can't be statically guaranteed.
                 yield self._issue(status="caveat",
                     message="<fieldset> 開頭含動態表達式 — 無法確認 <legend> 是否為第一個子元素",
                     node=fs)
@@ -122,7 +139,6 @@ class FieldsetLegendLint(LintRule):
                 continue
             text = _jsx_element_text(first).strip()
             if not text:
-                # Could be dynamic content inside legend — caveat
                 yield self._issue(status="caveat",
                     message="<legend> 無靜態文字內容 — 請確認 runtime 給的文字非空",
                     node=first)
