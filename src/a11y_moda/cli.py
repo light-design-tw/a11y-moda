@@ -158,6 +158,110 @@ def main(ctx: click.Context, env_file: str | None) -> None:
     _load_env_files(env_file)
 
 
+def _serialize_lint(report) -> dict:
+    return {
+        "summary": report.summary,
+        "files": [
+            {
+                "path": fr.path,
+                "language": fr.language,
+                "fetch_error": fr.fetch_error,
+                "by_status": fr.by_status,
+                "issues": [
+                    {
+                        "rule_id": i.rule_id,
+                        "guideline": i.guideline,
+                        "level": int(i.level),
+                        "desc": i.desc,
+                        "message": i.message,
+                        "snippet": i.snippet,
+                        "status": i.status,
+                        "line": i.line,
+                        "col": i.col,
+                    }
+                    for i in fr.issues
+                ],
+            }
+            for fr in report.files
+        ],
+    }
+
+
+@main.command()
+@click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("--level", type=click.Choice(["A", "AA", "AAA"]), default="AA",
+              help="Compliance level. Lint emits all rules at or below this level.")
+@click.option("--fail-only", is_flag=True, default=False,
+              help="Show only `fail` issues (drop caveat/info). Useful for CI gating.")
+@click.option("--strict", is_flag=True, default=False,
+              help="Exit with non-zero status when any `fail` issue is present. "
+                   "For pre-commit / CI: combine with --fail-only for hard gates.")
+@click.option("--format", "fmt", type=click.Choice(["json", "md"]), default="json",
+              help="Output format. JSON is the stable contract for AI agents and tools; "
+                   "md is for humans.")
+@click.option("--output", "-o", type=click.Path(), default=None,
+              help="Write report to file. Bare filename → ./reports/<file>.")
+def lint(paths: tuple[str, ...], level: str, fail_only: bool, strict: bool,
+         fmt: str, output: str | None) -> None:
+    """Source-level a11y lint for JSX / TSX / JS / HTML files.
+
+    Pass one or more paths — files or directories. Directories are walked
+    recursively (excluding node_modules, .next, dist, build, .git, etc.).
+
+    Three-tier issue status:
+
+      fail    AST confirmed a violation (e.g. <img> with no alt at all).
+      caveat  AST sees the pattern but cannot statically confirm — typically
+              dynamic values (`alt={var}`) or rules whose verdict requires
+              runtime CSS / DOM. AI agents reading the report can decide
+              whether to act.
+      info    AST advisory only — pattern is borderline (e.g. alt="" might
+              be correct for decorative images).
+
+    Lint runs without LLM, browser, or network. Same rule_id space as the
+    `scan` / `site` commands; share the same MODA codes across the pipeline.
+    """
+    from .lint.runner import expand_paths, lint_files
+    resolved = expand_paths(paths)
+    if not resolved:
+        click.echo("no source files found in the given paths", err=True)
+        sys.exit(1)
+    print(f"linting {len(resolved)} file(s)", file=sys.stderr)
+    report = lint_files(resolved, level=Level[level])
+    if fail_only:
+        for fr in report.files:
+            fr.issues = [i for i in fr.issues if i.status == "fail"]
+    fmt = _resolve_fmt(fmt, output)
+    if fmt == "md":
+        text = _lint_to_markdown(report)
+    else:
+        text = json.dumps(_serialize_lint(report), ensure_ascii=False, indent=2)
+    _write(text, output)
+    if strict and report.summary.get("fail", 0) > 0:
+        sys.exit(1)
+
+
+def _lint_to_markdown(report) -> str:
+    s = report.summary
+    lines = [
+        f"# a11y-moda lint",
+        "",
+        f"- files: **{s['files_scanned']}**",
+        f"- fail: **{s['fail']}**, caveat: {s['caveat']}, info: {s['info']}",
+        "",
+    ]
+    for fr in report.files:
+        if not fr.issues:
+            continue
+        lines.append(f"## `{fr.path}`")
+        lines.append("")
+        for i in fr.issues:
+            badge = {"fail": "🔴", "caveat": "🟡", "info": "🔵"}.get(i.status, "⚪")
+            lines.append(f"- {badge} **L{i.line}:C{i.col}** `{i.rule_id}` — {i.message}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 @main.command()
 @click.argument("url")
 @click.option("--level", type=click.Choice(["A", "AA", "AAA"]), default="AA")
