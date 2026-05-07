@@ -90,9 +90,19 @@ jobs:
             echo "FALLBACK=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Detect prerelease from tag (PEP 440 a/b/rc suffix)
+        id: prerelease
+        run: |
+          if [[ "${GITHUB_REF_NAME}" =~ (a|b|rc)[0-9]+$ ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
           body_path: ${{ steps.changelog.outputs.FALLBACK == 'false' && 'release_notes.md' || '' }}
           generate_release_notes: ${{ steps.changelog.outputs.FALLBACK == 'true' }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease == 'true' }}
           files: dist/*
           fail_on_unmatched_files: true
