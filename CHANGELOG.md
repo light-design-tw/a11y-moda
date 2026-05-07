@@ -9,39 +9,79 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [0.2.0] — 2026-05-08
 
-Local build output audit. The big new use case: scan an Astro / Next
-export / Hugo / Eleventy / SvelteKit-static `dist/` directory directly
-from disk, without spinning up a dev server.
+Two big additions, both targeting the **write/build** stage of the
+workflow (T1–T6) where rendered-DOM scan can't reach: source-level
+`lint` and `file://` build-output audit.
 
-### Added
-- `--allow-file` flag on both `scan` and `site`. Permits `file://` URLs
-  and accepts plain filesystem paths (`./index.html`, `D:\dist\`,
-  `/var/www/site/`). Off by default so a redirect from a public site
-  can't trick the scanner into reading local files.
+### Added — `lint` command (source-level static analysis)
+
+- New `a11y-moda lint <paths...>` subcommand. Walks JSX/TSX/TS/JS/HTML
+  source via tree-sitter, runs deterministic AST checks. **No
+  LLM/VLM** — fast, offline, repeatable. Complements rendered-DOM
+  `scan` (different signal, same rule_id namespace).
+- **50 rules ported** from the scan rule set (out of ~77 lintable),
+  spanning: image-alt family, page metadata, forms structure,
+  ARIA roles/labels, navigation/landmark, link text, headings,
+  tables, lang attributes, deprecated tags, keyboard handlers,
+  inline style, RTL/bidi, viewport, media controls, dialog/carousel
+  patterns, focus visibility.
+- Three-tier status — `fail` (deterministic violation), `caveat`
+  (likely violation but needs human/runtime check; e.g. wrapper
+  components with `{...spread}`), `info` (style/preference). Lets
+  AI agents decide which to act on; `--fail-only` filters to fail
+  tier; `--strict` exits non-zero on any issue.
+- `--exclude PATTERN` (repeatable, gitignore-style globs); built-in
+  excludes for `node_modules` / `.next` / `dist` / `build` / `.git`
+  / `.cache` etc. `.gitignore` respected by default; opt out with
+  `--no-gitignore`.
+- Output formats: `--format json|md`, `-o FILE` honored same as
+  `scan`/`site`.
+- Wrapper-component heuristic — capital-first JSX tags
+  (`<Button>`, `<Dialog>`) downgrade keyboard/structure violations
+  to `caveat`, since shadcn/Radix/HeadlessUI commonly delegate
+  accessibility to the underlying primitive.
+- Decorative-image heuristic — `<img alt="">` paired with explicit
+  `role="presentation"` / `role="none"` / `aria-hidden="true"` is
+  recognised as intentional and skipped silently.
+- New runtime dependencies: `tree-sitter` (>=0.23,<0.26),
+  `tree-sitter-typescript`, `tree-sitter-html`, `pathspec`.
+
+### Added — `file://` build-output audit
+
+- `--allow-file` flag on both `scan` and `site`. Permits `file://`
+  URLs and accepts plain filesystem paths (`./index.html`,
+  `D:\dist\`, `/var/www/site/`). Off by default so a redirect from
+  a public site can't trick the scanner into reading local files.
 - `A11Y_ALLOW_FILE=1` environment variable equivalent.
-- Filesystem-walk discovery for `site` mode when target is a `file://`
-  URL or directory. Recursively finds all `*.html` / `*.htm` files,
-  sorts deterministically, respects `--max-pages` / `--exclude-folder`.
-  Sitemap and BFS link-crawl don't apply (build output has no sitemap;
-  following `<a href>` from local files is not what users expect).
+- Filesystem-walk discovery for `site` mode when target is a
+  `file://` URL or directory. Recursively finds all `*.html` /
+  `*.htm` files, sorts deterministically, respects `--max-pages` /
+  `--exclude-folder`. Sitemap and BFS link-crawl don't apply
+  (build output has no sitemap; following `<a href>` from local
+  files is not what users expect).
 - `crawler.discover_filesystem(start_url, ...)` public function.
-- Relative paths (`./out/`, `dist/index.html`) and Windows backslash
-  paths (`D:\dist\index.html`) are auto-resolved to absolute `file://`
-  URIs when `--allow-file` is on.
+- Relative paths (`./out/`, `dist/index.html`) and Windows
+  backslash paths (`D:\dist\index.html`) auto-resolve to absolute
+  `file://` URIs when `--allow-file` is on.
 - `fetcher._read_local_file()` for the static path; `fetch_with_page`
   (Playwright) handles `file://` natively, no extra code needed.
 
 ### Notes
+
 - `--render` works with `file://` — Playwright loads the file URL
   natively; all probes (contrast, focus, tab walk, form simulation,
   screenshots) operate on the rendered local DOM.
 - `_security.is_safe_http_url()` gains an `allow_file` parameter
   (defaults to env var). Existing callers pass through unchanged.
-- Workflow positioning: this complements rather than replaces
-  source-time linters (eslint-plugin-jsx-a11y) and LLM source review
-  (DopplerKuo a11y-tw-audit-skill). a11y-moda's value is real
-  rendered-DOM rules with MODA rule_id mapping; the new file:// path
-  unlocks that for the build-output stage of the workflow.
+- **Workflow positioning** — `lint` covers T1–T3 (write/edit/save),
+  `file://` scan covers T4–T6 (build/preview/pre-deploy), HTTP scan
+  covers T7+ (staging/prod). All share the MODA rule_id namespace.
+  Complements rather than replaces `eslint-plugin-jsx-a11y` (no
+  MODA rule_id mapping) and DopplerKuo `a11y-tw-audit-skill` (LLM
+  at write-time).
+- Lint rule files live at `src/a11y_moda/lint/codes/<topic>/<RULE_ID>.py`
+  with auto-discovery (one file per rule_id, mirrors `rules/codes/`
+  layout).
 
 [0.2.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.2.0
 

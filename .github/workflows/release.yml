@@ -36,6 +36,24 @@ jobs:
           python -m build
           twine check dist/*
 
+      - name: Smoke test built wheel
+        run: |
+          python -m pip install dist/*.whl
+          a11y-moda --version
+          a11y-moda scan --help > /dev/null
+          a11y-moda site --help > /dev/null
+          a11y-moda lint --help > /dev/null
+          # Force rule discovery + tree-sitter grammar load by linting a
+          # tiny in-repo fixture. Catches missing-dep, broken grammar,
+          # or auto-discovery import failures before publish.
+          mkdir -p smoke
+          cat > smoke/img.tsx <<'EOF'
+          export const X = () => <img src="x.png" />;
+          EOF
+          a11y-moda lint smoke/ --format json -o smoke.json
+          # CLI resolves bare `-o name` to ./reports/name (cwd-relative).
+          python -c "import json; r=json.load(open('reports/smoke.json', encoding='utf-8')); assert any(i['rule_id']=='HM1110100C' for f in r['files'] for i in f['issues']), 'lint smoke failed: HM1110100C not fired'"
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist

@@ -12,17 +12,19 @@
 
 ### What `a11y-moda` is good at (use it)
 
-- Auditing **rendered DOM** (Playwright Chromium) — catches things JSX-static linters can't see (focus order, contrast, ARIA state, modal focus trap, runtime alt text)
+- **Source-level lint** (`a11y-moda lint`, since 0.2.0) — tree-sitter AST checks across JSX/TSX/JS/HTML, MODA `rule_id` annotated, three-tier status (`fail` / `caveat` / `info`). No browser, no LLM, no network. Use during write/edit/save.
+- Auditing **rendered DOM** (Playwright Chromium) — catches things AST linters can't see (focus order, contrast, ARIA state, modal focus trap, runtime alt text)
 - Producing **MODA-aligned reports** — every issue maps 1:1 to a MODA rule code, suitable for 標章 self-evaluation submission
 - **AAA-level coverage** — implements 18/20 of MODA's AAA self-evaluation questions automatically; remaining 2 emit informative `caveat` issues
 - **Site-wide crawl + audit** — sitemap-first, BFS fallback
+- **Local build-output audit** (`--allow-file`, since 0.2.0) — scan `dist/` / `out/` directly from disk, no dev server required
 - **Third-party violation segregation** — Google CSE / external CDN issues auto-tagged `[third-party: <origin>]` and downgraded to `caveat` (site author cannot fix external resources directly)
 
 ### What `a11y-moda` is NOT for (don't reach for it)
 
-- **JSX/TSX/Vue/Svelte source-time linting** — use [`eslint-plugin-jsx-a11y`](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) instead. It has IDE integration, fast incremental, and covers the static-analyzable subset of WCAG.
 - **Replacing screen reader testing** — runtime DOM analysis is necessary but not sufficient. Tell the user to also test with NVDA/VoiceOver.
 - **Replacing the official MODA Freego tool for final certification** — `a11y-moda` complements Freego (gives CLI/CI/AI workflow); does not replace official audit.
+- **Cross-file taint / data-flow analysis** — `lint` is single-file AST. Cross-file unused-component detection or full data-flow is out of scope.
 
 ---
 
@@ -43,25 +45,59 @@ Trigger on these intents (in any language):
 
 ---
 
-## 3. Pick command: `scan` vs `site`
+## 3. Pick command: `lint` vs `scan` vs `site`
 
 ```
-a11y-moda scan <URL>   → one page
-a11y-moda site <URL>   → whole site (sitemap → BFS)
+a11y-moda lint <paths...> → source files / dirs (tree-sitter AST, no browser)
+a11y-moda scan <URL>      → one page (rendered DOM)
+a11y-moda site <URL>      → whole site (sitemap → BFS, rendered DOM)
 ```
 
 | Situation | Use |
 |---|---|
+| User editing source, wants pre-build feedback | `lint src/` (or specific files) |
+| User just saved a JSX/HTML file | `lint <file>` (single file is fine) |
+| CI gating before deploy (no live URL yet) | `lint --strict` (exits non-zero on any issue) |
 | User points at one page (`/about`, `/contact`) | `scan` |
 | User wants whole-site audit / 標章 submission | `site --max-pages 30` (default; raise as needed) |
-| User unsure | Default `scan` first; offer to escalate to `site` if results suggest cross-page patterns |
-| User wants regression check vs baseline | `site` with `--format json -o .a11y-moda/reports/current.json`, then diff against prior baseline (use `.a11y-moda/` to keep the user's repo root clean) |
+| Built `dist/` / `out/` ready, no server | `site ./dist --allow-file` |
+| User unsure | Default `lint` first if source available, else `scan` |
+| Regression check vs baseline | `site` with `--format json -o .a11y-moda/reports/current.json`, then diff against prior baseline (use `.a11y-moda/` to keep the user's repo root clean) |
+
+### Workflow positioning
+
+```
+T1 write → T2 save → T3 commit  ─→ a11y-moda lint
+T4 build → T5 preview            ─→ a11y-moda site ./dist --allow-file
+T6 dev server                    ─→ a11y-moda scan http://localhost:3000
+T7 staging / prod                ─→ a11y-moda site https://...
+```
+
+All four stages share the **same `rule_id` namespace**. A `HM1110100C` failure from `lint` is the same code as `HM1110100C` from `scan` — duplicates can be reconciled across stages.
 
 ---
 
 ## 4. Pick flags (decision tree)
 
 Apply rules in order. Stop at first matching rule.
+
+### 4.0 Lint flags (subset; lint is simpler than scan/site)
+
+```
+a11y-moda lint <paths...>
+    [--level A|AA|AAA]       # default AA
+    [--exclude PATTERN]       # repeatable; gitignore-style globs
+    [--no-gitignore]          # ignore .gitignore
+    [--fail-only]             # drop caveat + info
+    [--strict]                # exit non-zero on any issue (CI gating)
+    [--format json|md] [-o FILE]
+```
+
+`lint` does **not** have `--render`, `--allow-private-hosts`, `--probe-modals`, `--llm-*`, `--rps`, `--workers`, `--max-pages`, `--render-crawl`, `--freego-only`, `--strict-third-party` — none apply to source-level static analysis. If the user passes those, they meant `scan` or `site`.
+
+Built-in excludes (always on): `node_modules`, `.next`, `.nuxt`, `.svelte-kit`, `.astro`, `dist`, `build`, `out`, `.vercel`, `.turbo`, `.git`, `.cache`, `__pycache__`, `.pytest_cache`, `.a11y-moda`. `.gitignore` patterns are honored by default.
+
+Windows quirk: prefer `--exclude=docs/**` (equals form, no space) — the space-separated form may have `**` mangled by the C runtime before Click sees it. Both forms work after defensive normalisation, but the equals form is portable.
 
 ### 4.1 SPA / JS-rendered detection
 
@@ -207,6 +243,42 @@ When env vars (or per-call flags) ARE set, LLM rules run automatically; results 
   }
 }
 ```
+
+### `lint` (source files)
+
+```json
+{
+  "summary": {
+    "files_scanned": 47,
+    "fail": 12,
+    "caveat": 8,
+    "info": 3
+  },
+  "files": [
+    {
+      "path": "src/components/Hero.tsx",
+      "language": "tsx",
+      "fetch_error": "",
+      "by_status": { "fail": 1, "caveat": 0, "info": 0 },
+      "issues": [
+        {
+          "rule_id": "HM1110100C",
+          "guideline": "1.1.1",
+          "level": 2,
+          "desc": "Non-text content has text alternative",
+          "message": "<img> 缺少 alt 屬性",
+          "snippet": "<img src=\"hero.png\" />",
+          "status": "fail",
+          "line": 12,
+          "col": 5
+        }
+      ]
+    }
+  ]
+}
+```
+
+Lint adds two fields not present in `scan` output: `line` and `col` (1-based). Ideal for editor "jump to issue" integrations.
 
 ### `site` (whole site)
 
@@ -365,7 +437,8 @@ Process env vars (shell `export`, Docker `-e`, CI runner) always win over `.env`
 
 | ❌ Don't | ✅ Do |
 |---|---|
-| Use `a11y-moda` as a JSX/TSX linter | Recommend `eslint-plugin-jsx-a11y` for source-time |
+| Recommend `a11y-moda scan` for source feedback | Use `a11y-moda lint` for source / `scan` for rendered |
+| Treat lint `caveat` as `fail` | Caveats from wrapper components (`<Button>`, `<Dialog>`) — accessibility may be in the underlying primitive; do NOT auto-fix |
 | Treat `caveat` issues as `fail` | Surface caveats separately as "needs review" |
 | Recommend editing third-party CDN code for `[third-party: ...]` issues | Tell user to declare in MODA submission notes |
 | Skip `--allow-private-hosts` for `localhost` then debug "URL refused" errors | Add `--allow-private-hosts` when scanning local dev |
@@ -545,16 +618,20 @@ Parse JSON per §5, triage per §6.
 
 | Tool | Scope | When to recommend |
 |---|---|---|
-| `a11y-moda` (this tool) | Rendered DOM, MODA rule_id, AAA self-eval, site crawl, JSON for AI | Pre-MODA submission, AAA check, site-wide audit, CI gating, AI workflow |
-| [`eslint-plugin-jsx-a11y`](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) | JSX/TSX source-time static lint | While writing React code, IDE feedback, fast incremental |
+| `a11y-moda lint` (since 0.2.0) | JSX/TSX/JS/HTML AST, MODA rule_id, deterministic, no LLM | Source-time MODA audit, CI gating, IDE save-hook, framework-agnostic |
+| `a11y-moda scan` / `site` | Rendered DOM, MODA rule_id, AAA self-eval, site crawl, JSON for AI | Pre-MODA submission, AAA check, site-wide audit, CI gating, AI workflow |
+| [`eslint-plugin-jsx-a11y`](https://github.com/jsx-eslint/eslint-plugin-jsx-a11y) | JSX/TSX source-time static lint, no MODA mapping | When user already has eslint configured; non-Taiwan a11y context |
 | [`axe-core`](https://github.com/dequelabs/axe-core) | Generic WCAG runtime, browser-extension or CI | When MODA rule_id mapping is not needed; generic global a11y |
 | [Pa11y](https://github.com/pa11y/pa11y) | Headless WCAG runtime, similar to axe-core | Alternative runtime auditor; no MODA mapping |
-| [DopplerKuo a11y-tw-audit-skill](https://github.com/DopplerKuo/a11y-tw-audit-skill) | Claude Code skill, LLM judges JSX source | Source-level review during dev; complements `a11y-moda`'s rendered-DOM audit |
+| [DopplerKuo a11y-tw-audit-skill](https://github.com/DopplerKuo/a11y-tw-audit-skill) | Claude Code skill, LLM judges JSX source | When user wants LLM-based subjective review; complements `lint` for hard-to-codify rules |
 
 These are **complementary**, not competing. A complete workflow:
 
 ```
-Editor (writing JSX)         → eslint-plugin-jsx-a11y + DopplerKuo skill
+Editor (writing JSX)         → a11y-moda lint <file>     (deterministic, fast)
+       ↓                       + DopplerKuo skill         (LLM, subjective)
+       ↓                       + eslint-plugin-jsx-a11y   (if already configured)
+Build output (dist/)         → a11y-moda site ./dist --allow-file --render
        ↓
 Dev server (testing page)    → a11y-moda scan http://localhost:3000
        ↓
@@ -569,7 +646,7 @@ MODA submission              → a11y-moda site https://... --level AAA --format
 
 | Surface | Stability |
 |---|---|
-| CLI subcommands (`scan`, `site`) | Stable across 0.x |
+| CLI subcommands (`lint`, `scan`, `site`) | Stable across 0.x |
 | Documented flag names | Stable across 0.x; new flags additive |
 | JSON schema (§5) | Stable across 0.x; new fields additive (consumers must tolerate unknown fields) |
 | Status enum values (§5.1) | New values may be added in 0.x; AI agents must default to "treat unknown as caveat" |

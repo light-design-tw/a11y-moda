@@ -39,9 +39,28 @@ a11y-moda not installed. Install with:
 
 | User says | Scope |
 |---|---|
+| "lint my source" / "check my JSX" / "before commit" / "while I'm coding" | `lint` (§2a) |
 | One URL / one page / `/path` | `scan` |
 | "Whole site" / "every page" / "MODA 標章" | `site` |
-| Ambiguous | Default `scan`; offer to escalate to `site` after results |
+| Ambiguous, source repo present, no live URL given | Default `lint` first (fast feedback) |
+| Ambiguous, URL or path given | Default `scan`; offer to escalate to `site` after results |
+
+### 2a. Lint scope (since 0.2.0)
+
+`lint` is **source-level static analysis** — tree-sitter AST over JSX/TSX/JS/HTML. No browser, no LLM, no network. Fast (sub-second on typical components). Use when:
+
+- User just edited / saved a JSX/TSX/HTML file
+- User wants pre-commit / pre-build feedback
+- Live URL not available yet
+- CI gating before deploy
+
+`lint` shares the **same `rule_id` namespace** as `scan` / `site` — issues from `lint` reference the same MODA codes.
+
+```bash
+a11y-moda lint <path-or-file> [--level AA|AAA] [--exclude '**/*.test.*'] [--strict]
+```
+
+`lint` skips: `--render`, `--allow-private-hosts`, `--probe-modals`, `--llm-*`, `--rps`, `--workers`, `--max-pages`, `--render-crawl`. None apply to AST analysis.
 
 ---
 
@@ -309,8 +328,8 @@ For full fix-loop details (site mode `pages_affected` diff, baseline naming conv
 
 | Task | Redirect to |
 |---|---|
-| JSX/TSX source-time lint | `eslint-plugin-jsx-a11y` |
-| AI source review (no CLI) | DopplerKuo's [`a11y-tw-audit-skill`](https://github.com/DopplerKuo/a11y-tw-audit-skill) |
+| Generic JSX lint (no MODA mapping) | `eslint-plugin-jsx-a11y` (use it alongside `a11y-moda lint` if user already has eslint) |
+| LLM-based subjective source review | DopplerKuo's [`a11y-tw-audit-skill`](https://github.com/DopplerKuo/a11y-tw-audit-skill) (complements `a11y-moda lint` for hard-to-codify rules) |
 | Generic axe-core (no MODA mapping) | `npx @axe-core/cli` |
 | Screen reader testing | Manual NVDA / VoiceOver / TalkBack |
 | Final MODA certification | Official [Freego](https://accessibility.moda.gov.tw/) |
