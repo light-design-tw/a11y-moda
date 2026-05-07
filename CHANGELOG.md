@@ -7,6 +7,13 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.1.0a1] — 2026-05-07
+
+Dry-run alpha to validate the PyPI publish pipeline (OIDC trusted publisher,
+GitHub environment gating, CHANGELOG extraction). Same code as the planned
+0.1.0; no functional differences. Pre-releases are excluded from
+`pip install a11y-moda` by default — pass `--pre` to install this alpha.
+
 ## [0.1.0] — 2026-05-07
 
 First public release on PyPI.
@@ -33,3 +40,4 @@ First public release on PyPI.
 
 [Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
+[0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1
