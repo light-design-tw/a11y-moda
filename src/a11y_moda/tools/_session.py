@@ -17,12 +17,24 @@ _DEFAULT_VIEWPORT = {"width": 1280, "height": 800}
 _DEFAULT_PAGE_TIMEOUT_MS = 15000
 
 
+_CHROMIUM_HINT = (
+    "Chromium not installed for Playwright. Run:\n"
+    "    playwright install chromium\n"
+    "(pip install does not download browsers; this is a one-time step.)"
+)
+
+
 @contextmanager
 def shared_browser():
     """Launch chromium once for the lifetime of the with-block."""
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import sync_playwright, Error as PlaywrightError
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        try:
+            browser = p.chromium.launch(headless=True)
+        except PlaywrightError as e:
+            if "Executable doesn't exist" in str(e) or "playwright install" in str(e):
+                raise SystemExit(_CHROMIUM_HINT) from e
+            raise
         try:
             yield browser
         finally:

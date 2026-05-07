@@ -17,11 +17,13 @@ LLM-assisted (OpenAI-compatible endpoint) for human-judgement rules (E codes). W
 ## Install
 
 ```bash
-pip install -e .
-playwright install chromium    # required for --render
+pip install a11y-moda           # PyPI
+playwright install chromium     # required for --render
 ```
 
 Python ≥ 3.10.
+
+> ⚠️ `pip install` does **not** download Chromium. Run `playwright install chromium` before `--render`, otherwise you'll hit `Executable doesn't exist`.
 
 ## Quick start
 

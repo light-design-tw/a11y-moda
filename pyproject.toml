@@ -3,7 +3,8 @@ name = "a11y-moda"
 version = "0.1.0"
 description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "睞特股份有限公司", email = "maple@light-design.com.tw" },
 ]
@@ -12,7 +13,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Natural Language :: Chinese (Traditional)",
     "Programming Language :: Python :: 3",
@@ -40,16 +40,14 @@ dependencies = [
 Homepage = "https://github.com/light-design-tw/a11y-moda"
 Repository = "https://github.com/light-design-tw/a11y-moda"
 Issues = "https://github.com/light-design-tw/a11y-moda/issues"
-
-[project.optional-dependencies]
-llm = ["anthropic>=0.40"]
-report = ["jinja2>=3.1", "markdown>=3.6"]
+Documentation = "https://github.com/light-design-tw/a11y-moda#readme"
+Changelog = "https://github.com/light-design-tw/a11y-moda/blob/main/CHANGELOG.md"
 
 [project.scripts]
 a11y-moda = "a11y_moda.cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
