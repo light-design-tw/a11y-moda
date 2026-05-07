@@ -80,6 +80,18 @@ a11y-moda site https://example.com \
   --format html -o report.html
 ```
 
+掃 build 出來的本地檔案 (Astro / Next export / Hugo / Eleventy 等 SSG)：
+
+```bash
+# 單檔
+a11y-moda scan ./dist/index.html --allow-file --render
+
+# 整個 dist 目錄遞迴 (走檔案系統，不靠 sitemap)
+a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-audit.html
+```
+
+`--allow-file` opt-in 才放行 `file://`。預設關閉，避免外部 redirect 騙工具讀本地檔。Windows 反斜線路徑 (`D:\dist\index.html`) 跟 POSIX 路徑都接受。
+
 LLM endpoint 用環境變數 (沒給 `--llm-*` flag 時 fallback)：
 
 ```bash

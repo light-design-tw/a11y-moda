@@ -40,7 +40,15 @@ a11y-moda site https://example.com \
   --level AAA --max-pages 30 --render \
   --llm-base-url http://localhost:8000/v1 --llm-model qwen3-vl-8b \
   --format html -o report.html
+
+# Local build output (Astro / Next export / Hugo / Eleventy / SvelteKit-static)
+a11y-moda scan ./dist/index.html --allow-file --render
+a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-audit.html
 ```
+
+`--allow-file` is opt-in. Off by default so a redirect from a public site
+can't trick the scanner into reading local files. Accepts both POSIX
+(`/var/www/site/`) and Windows (`D:\dist\index.html`) paths.
 
 LLM endpoint via env (used when `--llm-*` flags omitted):
 

@@ -1,5 +1,15 @@
-"""HTTP fetch + parse. Static httpx by default; Playwright when --render given."""
+"""HTTP fetch + parse. Static httpx by default; Playwright when --render given.
+
+`file://` URLs are allowed when `--allow-file` (CLI) or `A11Y_ALLOW_FILE=1`
+(env) is set — used to audit local build output without spinning up a
+dev server. The static path reads from disk via Path; the rendered path
+hands the URL to Playwright which natively handles `file://`.
+"""
 from __future__ import annotations
+from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
+
 from bs4 import BeautifulSoup
 import httpx
 
@@ -10,6 +20,26 @@ from ._security import require_safe_http_url, UnsafeURLError
 from . import USER_AGENT as _DEFAULT_UA
 
 
+def _read_local_file(url: str) -> tuple[int, str, str]:
+    """Read a file:// URL from disk. Returns (status_code, html, error).
+
+    status_code: 200 on success, 404 on missing, 0 on read error.
+    """
+    p_url = urlparse(url)
+    # url2pathname handles the Windows drive-letter case correctly:
+    #   file:///D:/x/y.html  → D:\x\y.html
+    #   file:///home/u/x.html → /home/u/x.html
+    fs_path = Path(url2pathname(p_url.path))
+    if not fs_path.exists():
+        return 0, "", f"file not found: {fs_path}"
+    if not fs_path.is_file():
+        return 0, "", f"not a file (is it a directory?): {fs_path}"
+    try:
+        return 200, fs_path.read_text(encoding="utf-8", errors="replace"), ""
+    except Exception as e:
+        return 0, "", f"{type(e).__name__}: {e}"
+
+
 def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> tuple[PageReport, BeautifulSoup | None, str]:
     report = PageReport(url=url)
     try:
@@ -17,6 +47,14 @@ def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> t
     except UnsafeURLError as e:
         report.fetch_error = str(e)
         return report, None, ""
+    if url.startswith("file://"):
+        status, html, err = _read_local_file(url)
+        if err:
+            report.fetch_error = err
+            return report, None, ""
+        report.status_code = status
+        soup = BeautifulSoup(html, "lxml")
+        return report, soup, html
     try:
         with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua}) as cli:
             r = cli.get(url)

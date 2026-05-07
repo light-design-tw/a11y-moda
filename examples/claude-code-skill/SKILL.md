@@ -76,6 +76,7 @@ Apply each row independently.
 |---|---|
 | SPA detected | `--render` (+ `--render-crawl` for `site`) |
 | Local URL (localhost / 127.0.0.1 / RFC1918) | `--allow-private-hosts` |
+| Target is a filesystem path or `file://` URL (build output, no dev server) | `--allow-file` (+ `--render` to actually render the file) |
 | User mentions "AAA" / "AAA 自評" | `--level AAA` |
 | User mentions "A only" | `--level A` |
 | Default level | `--level AA` (MODA 標章 baseline) |
@@ -84,6 +85,16 @@ Apply each row independently.
 | Skip E rules (machine-only) | `--freego-only` |
 | Production scan, be polite | `--rps 1 --delay 0.5` |
 | Site mode page cap (default 30) | `--max-pages N` |
+
+### When to use `--allow-file`
+
+User signals: "scan my build output", "audit dist/", "掃 build 結果", "static export", "no dev server", or pastes a path like `./dist/`, `D:\out\index.html`, `out/`.
+
+`--allow-file` accepts:
+- Plain paths: `./dist/`, `D:\out\index.html`, `/var/www/site/`
+- `file://` URIs: `file:///D:/dist/index.html`
+
+For `site` mode with a path/file://, the CLI walks the directory for `*.html` files (no sitemap, no link crawl) — that's the right behavior for SSG output. Always pair with `--render` if the build output is hydrated SPA (Next export, etc).
 
 **NEVER** add `--probe-modals` unless URL is dev/staging AND user explicitly asks. On production it can trigger booking / billing / analytics events.
 
@@ -128,12 +139,13 @@ Before substituting any value into a Bash command, validate it matches the expec
 
 | Placeholder | Allowed pattern | Source |
 |---|---|---|
-| `<URL>` | starts with `http://` or `https://`; no spaces | user input |
+| `<URL>` | starts with `http://`, `https://`, `file://`, OR a path under cwd / a known absolute prefix when `--allow-file` is on; no shell metacharacters | user input |
 | `<scope>` | exactly `scan` or `site` | your own decision (§2) |
 | `<LEVEL>` | exactly `A`, `AA`, or `AAA` | §3 |
 | `<PORT>` (in dev server probe) | `[0-9]+` only | package.json scripts heuristic |
 | `<RULE_ID>` (for `--ignore`) | `[A-Z]{2}[0-9]+[CE]?` | user mention |
 | `<other flag args>` | only flags from §4 decision table | your own decision |
+| Filesystem path | no `..` traversal escaping cwd, no shell metacharacters; for `--allow-file` path inputs, prefer absolute paths or paths under cwd | user input |
 
 Reject anything that doesn't match. Don't try to "sanitize" — refuse and re-ask.
 

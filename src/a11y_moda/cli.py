@@ -77,15 +77,33 @@ def _llm_options(f):
     return f
 
 
-def _enforce_url_safety(url: str, *, allow_private: bool) -> None:
+def _resolve_url(url: str, *, allow_file: bool) -> str:
+    """Convert filesystem paths to file:// URIs when --allow-file is set.
+
+    Lets the user pass `./index.html`, `D:\\dist\\index.html`, or
+    `/var/www/site/` as if it were a URL. Without --allow-file we leave
+    the value alone — the SSRF guard will reject a non-http(s) URL with a
+    clearer message than "file not found".
+    """
+    if not allow_file:
+        return url
+    if url.startswith(("http://", "https://", "file://")):
+        return url
+    p = Path(url).resolve()
+    return p.as_uri()
+
+
+def _enforce_url_safety(url: str, *, allow_private: bool, allow_file: bool = False) -> None:
     """Block accidental scans of localhost / metadata / file:// URLs."""
     if allow_private:
         os.environ["A11Y_ALLOW_PRIVATE_HOSTS"] = "1"
-    if not is_safe_http_url(url, allow_private=allow_private):
-        raise click.UsageError(
-            f"refused unsafe URL: {url!r}. Only public http(s) URLs allowed by default. "
-            f"Pass --allow-private-hosts to scan localhost / RFC1918 / link-local intranets."
-        )
+    if allow_file:
+        os.environ["A11Y_ALLOW_FILE"] = "1"
+    if not is_safe_http_url(url, allow_private=allow_private, allow_file=allow_file):
+        hints = ["Only public http(s) URLs allowed by default."]
+        hints.append("Pass --allow-private-hosts to scan localhost / RFC1918 / link-local intranets.")
+        hints.append("Pass --allow-file to scan local build output via file:// URLs or filesystem paths.")
+        raise click.UsageError(f"refused unsafe URL: {url!r}. " + " ".join(hints))
 
 
 def _serialize_page(report: PageReport) -> dict:
@@ -157,6 +175,11 @@ def main(ctx: click.Context, env_file: str | None) -> None:
 @click.option("--allow-private-hosts", is_flag=True, default=False,
               help="Permit scanning localhost / RFC1918 / link-local URLs (intranet audits). "
                    "Off by default to block SSRF via redirects / sitemaps to internal endpoints.")
+@click.option("--allow-file", is_flag=True, default=False,
+              help="Permit `file://` URLs and accept filesystem paths "
+                   "(./index.html, D:\\dist, /var/www/site) — used to audit local build output "
+                   "without spinning up a dev server. Off by default so a redirect from a "
+                   "public site can't trick the scanner into reading local files.")
 @click.option("--probe-modals", is_flag=True, default=False,
               help="Click likely modal-trigger buttons (預約/contact/register …) to discover "
                    "forms inside dialogs. OFF by default — clicking on production sites can "
@@ -173,13 +196,15 @@ def main(ctx: click.Context, env_file: str | None) -> None:
               help="If extension is .md/.html, format auto-detected")
 def scan(url: str, level: str, render: bool, freego_compat: bool,
          ignore: tuple[str, ...], freego_only: bool, no_extension: bool,
-         fail_only: bool, allow_private_hosts: bool, probe_modals: bool,
+         fail_only: bool, allow_private_hosts: bool, allow_file: bool,
+         probe_modals: bool,
          strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          fmt: str, output: str | None) -> None:
     """Scan a single URL."""
-    _enforce_url_safety(url, allow_private=allow_private_hosts)
+    url = _resolve_url(url, allow_file=allow_file)
+    _enforce_url_safety(url, allow_private=allow_private_hosts, allow_file=allow_file)
     sources = {"freego"} if (freego_only or no_extension) else None
     llm = _build_llm(llm_base_url, llm_key, llm_model)
     report = scan_page(url, level=Level[level], render=render,
@@ -224,6 +249,10 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
 @click.option("--allow-private-hosts", is_flag=True, default=False,
               help="Permit scanning localhost / RFC1918 / link-local URLs (intranet audits). "
                    "Off by default to block SSRF via redirects / sitemaps to internal endpoints.")
+@click.option("--allow-file", is_flag=True, default=False,
+              help="Permit `file://` URLs and accept filesystem paths. For `site`, walks the "
+                   "directory recursively for *.html files instead of crawling links / sitemap. "
+                   "Used to audit local build output (Astro/Next export/Hugo/Eleventy dist).")
 @click.option("--probe-modals", is_flag=True, default=False,
               help="Click likely modal-trigger buttons (預約/contact/register …) to discover "
                    "forms inside dialogs. OFF by default — clicking on production sites can "
@@ -245,14 +274,22 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          fail_only: bool, max_pages: int,
          source: str, workers: int, delay: float, rps: float,
          render_crawl: bool, exclude_url: tuple[str, ...], exclude_folder: tuple[str, ...],
-         max_time: float, allow_private_hosts: bool, probe_modals: bool,
+         max_time: float, allow_private_hosts: bool, allow_file: bool,
+         probe_modals: bool,
          strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          group_by: str, fmt: str, output: str | None) -> None:
     """Discover and scan a whole site."""
-    _enforce_url_safety(start_url, allow_private=allow_private_hosts)
-    if source == "sitemap":
+    start_url = _resolve_url(start_url, allow_file=allow_file)
+    _enforce_url_safety(start_url, allow_private=allow_private_hosts, allow_file=allow_file)
+    if start_url.startswith("file://"):
+        # Filesystem walk — sitemap / crawl don't apply to local build output.
+        from .crawler import discover_filesystem
+        urls = discover_filesystem(start_url, max_pages=max_pages,
+                                    exclude_urls=exclude_url,
+                                    exclude_folders=exclude_folder)
+    elif source == "sitemap":
         from .crawler import fetch_sitemap
         import asyncio
         urls = asyncio.run(fetch_sitemap(start_url))[:max_pages]

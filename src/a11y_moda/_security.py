@@ -18,6 +18,11 @@ def _allow_private_default() -> bool:
     return os.environ.get("A11Y_ALLOW_PRIVATE_HOSTS", "").strip() == "1"
 
 
+def _allow_file_default() -> bool:
+    """Operator can opt in via env var when auditing local build output."""
+    return os.environ.get("A11Y_ALLOW_FILE", "").strip() == "1"
+
+
 def _normalise_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address):
     """Unwrap IPv4-mapped IPv6 (`::ffff:127.0.0.1`) so private/loopback checks
     land on the embedded IPv4. ipaddress's is_loopback is False on the wrapper.
@@ -49,7 +54,8 @@ def _resolve_all(host: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Addres
     return out
 
 
-def is_safe_http_url(url: str, *, allow_private: bool | None = None) -> bool:
+def is_safe_http_url(url: str, *, allow_private: bool | None = None,
+                      allow_file: bool | None = None) -> bool:
     """True when URL is safe to fetch from arbitrary callers.
 
     Rejects: non-http(s) schemes, missing host, loopback / private / link-local
@@ -59,13 +65,21 @@ def is_safe_http_url(url: str, *, allow_private: bool | None = None) -> bool:
 
     Pass allow_private=True (or set A11Y_ALLOW_PRIVATE_HOSTS=1) to permit
     intranet scans.
+
+    Pass allow_file=True (or set A11Y_ALLOW_FILE=1) to permit `file://` URLs
+    pointing at local build output. Off by default so a redirect from a public
+    site can't trick the scanner into reading arbitrary local files.
     """
     if allow_private is None:
         allow_private = _allow_private_default()
+    if allow_file is None:
+        allow_file = _allow_file_default()
     try:
         p = urlparse(url)
     except Exception:
         return False
+    if p.scheme == "file":
+        return allow_file
     if p.scheme not in ("http", "https"):
         return False
     host = (p.hostname or "").lower()
@@ -86,7 +100,8 @@ def is_safe_http_url(url: str, *, allow_private: bool | None = None) -> bool:
     return not any(_ip_is_private(ip) for ip in ips)
 
 
-def require_safe_http_url(url: str, *, allow_private: bool | None = None) -> None:
+def require_safe_http_url(url: str, *, allow_private: bool | None = None,
+                            allow_file: bool | None = None) -> None:
     """Raise UnsafeURLError if the URL is not safe."""
-    if not is_safe_http_url(url, allow_private=allow_private):
+    if not is_safe_http_url(url, allow_private=allow_private, allow_file=allow_file):
         raise UnsafeURLError(f"refused unsafe URL (private/loopback/non-http): {url!r}")

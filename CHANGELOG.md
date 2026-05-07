@@ -7,6 +7,44 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-08
+
+Local build output audit. The big new use case: scan an Astro / Next
+export / Hugo / Eleventy / SvelteKit-static `dist/` directory directly
+from disk, without spinning up a dev server.
+
+### Added
+- `--allow-file` flag on both `scan` and `site`. Permits `file://` URLs
+  and accepts plain filesystem paths (`./index.html`, `D:\dist\`,
+  `/var/www/site/`). Off by default so a redirect from a public site
+  can't trick the scanner into reading local files.
+- `A11Y_ALLOW_FILE=1` environment variable equivalent.
+- Filesystem-walk discovery for `site` mode when target is a `file://`
+  URL or directory. Recursively finds all `*.html` / `*.htm` files,
+  sorts deterministically, respects `--max-pages` / `--exclude-folder`.
+  Sitemap and BFS link-crawl don't apply (build output has no sitemap;
+  following `<a href>` from local files is not what users expect).
+- `crawler.discover_filesystem(start_url, ...)` public function.
+- Relative paths (`./out/`, `dist/index.html`) and Windows backslash
+  paths (`D:\dist\index.html`) are auto-resolved to absolute `file://`
+  URIs when `--allow-file` is on.
+- `fetcher._read_local_file()` for the static path; `fetch_with_page`
+  (Playwright) handles `file://` natively, no extra code needed.
+
+### Notes
+- `--render` works with `file://` — Playwright loads the file URL
+  natively; all probes (contrast, focus, tab walk, form simulation,
+  screenshots) operate on the rendered local DOM.
+- `_security.is_safe_http_url()` gains an `allow_file` parameter
+  (defaults to env var). Existing callers pass through unchanged.
+- Workflow positioning: this complements rather than replaces
+  source-time linters (eslint-plugin-jsx-a11y) and LLM source review
+  (DopplerKuo a11y-tw-audit-skill). a11y-moda's value is real
+  rendered-DOM rules with MODA rule_id mapping; the new file:// path
+  unlocks that for the build-output stage of the workflow.
+
+[0.2.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.2.0
+
 ## [0.1.2] — 2026-05-08
 
 Polish batch — quality-of-life fixes that should have been in 0.1.0.
@@ -76,6 +114,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

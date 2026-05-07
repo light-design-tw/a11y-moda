@@ -94,9 +94,20 @@ ELSE:
 IF URL is localhost / 127.0.0.1 / RFC1918 (10.x / 172.16-31.x / 192.168.x):
     add --allow-private-hosts
     OR set env A11Y_ALLOW_PRIVATE_HOSTS=1
+
+IF URL is file:// OR target is a filesystem path (./out/, dist/, /var/www/site):
+    add --allow-file
+    OR set env A11Y_ALLOW_FILE=1
 ```
 
-Without this flag, the SSRF guard rejects localhost. The flag is opt-in to prevent accidental scanning of internal admin pages exposed via redirects.
+Both flags are opt-in to prevent SSRF / arbitrary-file-read via redirects from public sites.
+
+`--allow-file` accepts:
+- `file:///D:/dist/index.html` (Windows file URI)
+- `file:///var/www/site/index.html` (POSIX file URI)
+- `./dist/index.html` / `D:\dist\index.html` / `/var/www/site/` (auto-resolved to absolute file://)
+
+For `site` mode with a `file://` target, sitemap and link-crawl don't apply — `a11y-moda` recursively walks the directory for `*.html` / `*.htm` files. This is the right behavior for build output (Astro / Next export / Hugo / Eleventy / SvelteKit-static) where there's no live server and following `<a href>` links from local files would mix routes that may not exist on disk.
 
 ### 4.4 Output format
 
@@ -520,6 +531,10 @@ A11Y_LLM_MODEL=qwen3-vl-8b \
   a11y-moda site https://example.com \
     --level AAA --max-pages 30 --render --render-crawl \
     --format json -o .a11y-moda/reports/audit.json
+
+# Local build output (Astro / Next export / Hugo / Eleventy / SvelteKit-static)
+a11y-moda scan ./dist/index.html --allow-file --render --format json
+a11y-moda site ./dist --allow-file --render --level AA --format json
 ```
 
 Parse JSON per §5, triage per §6.

@@ -1,9 +1,17 @@
-"""Discover URLs to scan: sitemap.xml fetch, bounded same-domain crawl, optional JS render."""
+"""Discover URLs to scan: sitemap.xml fetch, bounded same-domain crawl, optional JS render.
+
+For `file://` URLs (auditing local build output), URL discovery does not
+crawl links nor look for sitemap.xml — it walks the filesystem directory
+for `*.html` files. Same-origin checks are replaced by same-root-directory
+checks.
+"""
 from __future__ import annotations
 import asyncio
 import time
 from collections import deque
+from pathlib import Path
 from urllib.parse import urljoin, urlparse, urldefrag
+from urllib.request import url2pathname
 
 # defusedxml hardens against billion-laughs / external-entity attacks in
 # untrusted sitemap.xml — drop-in replacement for stdlib xml.etree.
@@ -222,6 +230,36 @@ def _enqueue(html: str, current: str, origin: str, queue: deque[str], seen: set[
         queue.append(full)
 
 
+def discover_filesystem(start_url: str, *, max_pages: int = 30,
+                         exclude_urls: tuple[str, ...] = (),
+                         exclude_folders: tuple[str, ...] = ()) -> list[str]:
+    """Walk a local directory for *.html files. `start_url` is a file:// URL.
+
+    If the URL points at a single file, returns [start_url]. If it points at
+    a directory, returns all *.html files within (sorted, depth-first).
+    """
+    parsed = urlparse(start_url)
+    fs_path = Path(url2pathname(parsed.path))
+    if fs_path.is_file():
+        return [start_url] if fs_path.suffix.lower() in (".html", ".htm") else []
+    if not fs_path.is_dir():
+        return []
+    excl_url_set = set(exclude_urls)
+    out: list[str] = []
+    for p in sorted(fs_path.rglob("*.htm*")):
+        if p.suffix.lower() not in (".html", ".htm"):
+            continue
+        u = p.resolve().as_uri()
+        if u in excl_url_set:
+            continue
+        if any(folder and folder in u for folder in exclude_folders):
+            continue
+        out.append(u)
+        if len(out) >= max_pages:
+            break
+    return out
+
+
 def discover(
     start_url: str,
     *,
@@ -233,7 +271,15 @@ def discover(
     skip_ext: tuple[str, ...] = DEFAULT_SKIP_EXT,
     max_seconds: float = 0,
 ) -> list[str]:
-    """Sitemap-first, fall back to crawl. render only affects crawl path."""
+    """Sitemap-first, fall back to crawl. render only affects crawl path.
+
+    For `file://` URLs, sitemap/crawl don't apply — walk the filesystem
+    instead (see discover_filesystem).
+    """
+    if start_url.startswith("file://"):
+        return discover_filesystem(start_url, max_pages=max_pages,
+                                    exclude_urls=exclude_urls,
+                                    exclude_folders=exclude_folders)
     if prefer_sitemap:
         urls = asyncio.run(fetch_sitemap(start_url))
         urls = [u for u in urls if _same_origin(start_url, u)]
