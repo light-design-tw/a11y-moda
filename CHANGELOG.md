@@ -7,6 +7,25 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-05-08
+
+First dogfood patch — caught while running the v0.1.0 CLI against a real
+zh-TW Next.js site whose dark/light theme toggle was an icon-only button.
+
+### Fixed
+- `GN2141103E` (contrast toggle control) now recognises zh-TW theme
+  vocabulary (`深色模式`, `淺色模式`, `主題切換`, `切換主題`) plus
+  `light.?mode` / `theme.?toggle`. Previously the regex only matched
+  `dark.?mode` / `高對比` / `對比切換` / `無障礙模式`, so common Taiwanese
+  phrasing was missed.
+- `GN2141103E` now also scans `aria-label` / `title` / `alt` on
+  `<button>` / `<a>` / `<input>` elements, not just `soup.get_text()`.
+  Icon-only toggles (SVG inside the button, label provided via
+  `aria-label`) used to evade detection because their visible text was
+  empty.
+
+[0.1.1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.1
+
 ## [0.1.0a1] — 2026-05-07
 
 Dry-run alpha to validate the PyPI publish pipeline (OIDC trusted publisher,
@@ -38,6 +57,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.1...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1
