@@ -1,5 +1,9 @@
 # a11y-moda
 
+[![PyPI](https://img.shields.io/pypi/v/a11y-moda)](https://pypi.org/project/a11y-moda/)
+[![Python](https://img.shields.io/pypi/pyversions/a11y-moda)](https://pypi.org/project/a11y-moda/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/light-design-tw/a11y-moda/blob/main/LICENSE)
+
 > Python CLI for Taiwan MODA accessibility certification (無障礙標章) · WCAG A / AA / AAA · zh-TW reports
 
 [繁體中文](./README.md) · **English**
@@ -45,6 +49,13 @@ export A11Y_LLM_BASE_URL=https://api.openai.com/v1
 export A11Y_LLM_KEY=sk-...
 export A11Y_LLM_MODEL=gpt-4o-mini
 ```
+
+## AI agent integration
+
+Stable JSON schema, three-tier `status` enum (`fail` / `caveat` / `pass`), `[third-party: <origin>]` prefix on caveats from external resources — all designed for AI workflows (write → scan → fix → re-verify).
+
+- [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) — platform-agnostic guide. Inline snippets for Cursor `.cursorrules`, GitHub Copilot `.github/copilot-instructions.md`, and Aider.
+- [`examples/claude-code-skill/`](./examples/claude-code-skill/) — bundled Claude Code skill. Copy into `~/.claude/skills/a11y-moda/` then say "check a11y" / "WCAG audit" / "無障礙檢查".
 
 ## Coverage highlights
 

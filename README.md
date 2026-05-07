@@ -1,5 +1,9 @@
 # a11y-moda
 
+[![PyPI](https://img.shields.io/pypi/v/a11y-moda)](https://pypi.org/project/a11y-moda/)
+[![Python](https://img.shields.io/pypi/pyversions/a11y-moda)](https://pypi.org/project/a11y-moda/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/light-design-tw/a11y-moda/blob/main/LICENSE)
+
 > 台灣 MODA 無障礙標章自評用 Python CLI · WCAG A / AA / AAA · zh-TW 報告
 
 **繁體中文** · [English](https://github.com/light-design-tw/a11y-moda/blob/main/README.en.md)
@@ -83,6 +87,15 @@ export A11Y_LLM_BASE_URL=https://api.openai.com/v1
 export A11Y_LLM_KEY=sk-...
 export A11Y_LLM_MODEL=gpt-4o-mini
 ```
+
+## AI 協作 (Claude Code / Cursor / Copilot / Aider)
+
+a11y-moda 設計上對 AI agent 友善 — 穩定 JSON schema、`status` enum 三態 (`fail` / `caveat` / `pass`)、第三方資源 `[third-party: <origin>]` 前綴等都有規範。讓 AI 邊寫 code 邊掃 a11y、邊修邊重驗。
+
+| 文件 | 用途 |
+|---|---|
+| [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) | 通用 AI agent 整合指南 (任何能呼 CLI 的 LLM)。含 JSON schema、flag 決策樹、Cursor `.cursorrules` / GitHub Copilot `.github/copilot-instructions.md` / Aider 內嵌範本 |
+| [`examples/claude-code-skill/`](./examples/claude-code-skill/) | Claude Code skill 範本。複製進 `~/.claude/skills/a11y-moda/` 後對 Claude 說「掃 a11y」/「MODA 標章驗」即觸發 |
 
 ## 指令參考
 

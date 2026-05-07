@@ -7,6 +7,25 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-08
+
+Polish batch — quality-of-life fixes that should have been in 0.1.0.
+
+### Added
+- `a11y-moda --version` / `-V` now prints the installed version (was a
+  `click.UsageError: No such option` before).
+- README badges for PyPI version, supported Python versions, and license.
+- README pointer to `docs/AI_INTEGRATION.md` and the bundled Claude Code
+  skill — AI workflow features were undiscoverable from the main README.
+
+### Fixed
+- zh-TW console output on Windows. The default code page (cp950 on
+  Traditional Chinese systems, cp1252 on English) mojibakes the rule
+  output. CLI now reconfigures `sys.stdout` / `sys.stderr` to UTF-8 on
+  `win32`. POSIX systems are unaffected.
+
+[0.1.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.2
+
 ## [0.1.1] — 2026-05-08
 
 First dogfood patch — caught while running the v0.1.0 CLI against a real
@@ -57,6 +76,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.1.2...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

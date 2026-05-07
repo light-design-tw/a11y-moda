@@ -7,6 +7,16 @@ from pathlib import Path
 
 import click
 
+# Windows consoles default to a non-UTF-8 code page (cp950 on zh-TW Windows),
+# which mojibakes our zh-TW output. Reconfigure stdio before any rule output
+# is emitted. POSIX systems already default to UTF-8.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except (AttributeError, OSError):
+        pass
+
 from .crawler import crawl, discover
 from .llm import LLMClient, LLMConfig
 from .models import Level, PageReport, ScanReport
@@ -119,6 +129,7 @@ def _serialize_scan(scan: ScanReport) -> dict:
 
 
 @click.group()
+@click.version_option(None, "-V", "--version", package_name="a11y-moda", prog_name="a11y-moda")
 @click.option("--env-file", type=click.Path(exists=True, dir_okay=False), default=None,
               help="Path to a .env file (highest precedence; must exist). Otherwise "
                    "loads ./.env and ~/.config/a11y-moda/.env when present. Existing "
