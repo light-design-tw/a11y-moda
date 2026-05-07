@@ -191,6 +191,15 @@ def _serialize_lint(report) -> dict:
 @click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True))
 @click.option("--level", type=click.Choice(["A", "AA", "AAA"]), default="AA",
               help="Compliance level. Lint emits all rules at or below this level.")
+@click.option("--exclude", "exclude_globs", multiple=True,
+              help="Glob pattern to exclude (repeatable). Matches against paths "
+                   "relative to each scanned directory. Examples: "
+                   "'**/*.test.tsx', 'app/api/og/**', 'packages/embeds/**'. "
+                   "On Windows prefer the `--exclude=<pattern>` form (no space) — "
+                   "the space-separated form may have `**` mangled by the C runtime.")
+@click.option("--no-gitignore", is_flag=True, default=False,
+              help="Don't apply .gitignore patterns from scanned directories. "
+                   "Default: respected (matches behaviour of eslint, ruff, prettier).")
 @click.option("--fail-only", is_flag=True, default=False,
               help="Show only `fail` issues (drop caveat/info). Useful for CI gating.")
 @click.option("--strict", is_flag=True, default=False,
@@ -201,7 +210,8 @@ def _serialize_lint(report) -> dict:
                    "md is for humans.")
 @click.option("--output", "-o", type=click.Path(), default=None,
               help="Write report to file. Bare filename → ./reports/<file>.")
-def lint(paths: tuple[str, ...], level: str, fail_only: bool, strict: bool,
+def lint(paths: tuple[str, ...], level: str, exclude_globs: tuple[str, ...],
+         no_gitignore: bool, fail_only: bool, strict: bool,
          fmt: str, output: str | None) -> None:
     """Source-level a11y lint for JSX / TSX / JS / HTML files.
 
@@ -222,7 +232,8 @@ def lint(paths: tuple[str, ...], level: str, fail_only: bool, strict: bool,
     `scan` / `site` commands; share the same MODA codes across the pipeline.
     """
     from .lint.runner import expand_paths, lint_files
-    resolved = expand_paths(paths)
+    resolved = expand_paths(paths, exclude_globs=exclude_globs,
+                             respect_gitignore=not no_gitignore)
     if not resolved:
         click.echo("no source files found in the given paths", err=True)
         sys.exit(1)

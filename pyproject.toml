@@ -37,6 +37,7 @@ dependencies = [
     "tree-sitter>=0.23,<0.26",
     "tree-sitter-typescript>=0.23,<0.24",
     "tree-sitter-html>=0.23,<0.24",
+    "pathspec>=0.12,<1.0",
 ]
 
 [project.urls]
