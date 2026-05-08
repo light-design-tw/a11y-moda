@@ -1,0 +1,116 @@
+# a11y-moda — Cursor integration
+
+Use the `a11y-moda` Python CLI for Taiwan MODA accessibility checks. The
+project audits **rendered DOM** (`scan` / `site`) and **source code**
+(`lint`) against MODA rule_id (HM/GN/CS/AR/FA/SC) mapped to WCAG 2.1.
+
+Authoritative spec: `docs/AI_INTEGRATION.md` in the a11y-moda repo
+(<https://github.com/light-design-tw/a11y-moda>).
+
+## Pre-flight (one-time)
+
+```
+pip install a11y-moda                 # lint + rules subcommand only
+pip install 'a11y-moda[scan]'         # add browser-based scan/site
+playwright install chromium           # required for --render
+```
+
+If `a11y-moda` not installed, instruct the user to run the first line. Do
+not auto-install.
+
+## Proactive rule lookup — call BEFORE writing accessible elements
+
+When you are about to write or modify any of these JSX/TSX/HTML elements,
+**first call** `a11y-moda rules search` to load the relevant MODA rules,
+then write code that satisfies them:
+
+```
+<button>, <a> with onClick or href
+<form>, <input>, <textarea>, <select>, <label>
+<img>, <video>, <audio>, <iframe>, <picture>, <source>
+<table> (with data, not layout)
+<dialog>, <details>, <summary>
+<svg> with onClick or interactive role
+Anything with role=*, aria-*, tabindex
+```
+
+How to query (pick by need):
+
+```bash
+# Topic / element-keyword search (English aliases work)
+a11y-moda rules search button --format json
+a11y-moda rules search form   --format json
+a11y-moda rules search image  --format json
+a11y-moda rules search dialog --format json
+
+# WCAG SC lookup
+a11y-moda rules search 1.1.1  --format json    # all rules under SC 1.1.1
+
+# Detailed metadata for a specific rule_id
+a11y-moda rules show HM1110100C --format json
+a11y-moda explain HM1110100C --format json     # short alias
+
+# Filtered list
+a11y-moda rules list --topic forms   --level AA --format json
+a11y-moda rules list --scope lint    --format json     # lint-implementable only
+```
+
+JSON output gives `rule_id`, `guideline` (WCAG SC), `level` (1=A 2=AA 3=AAA),
+`level_name`, `desc`, `source` (freego/extension), `topic`, `scope`
+(scan/lint), `runtime_authoritative` (lint downgrades fail→caveat for these),
+`wcag_url`.
+
+Use the rule list to inform the code you write. Example: before writing a
+new `<button>`, call `rules search button`, see that GN1330204E and other
+button-related rules apply, write the code with proper `aria-label` /
+`type="button"` / keyboard handling from the start.
+
+## Reactive audit — after editing
+
+For one-page audit (rendered DOM, dev server running):
+
+```
+a11y-moda scan http://localhost:3000/path --level AA --render --allow-private-hosts --format json
+```
+
+For source-only lint (no browser, no LLM, no network):
+
+```
+a11y-moda lint src/ --level AA --format json
+```
+
+Whole-site audit:
+
+```
+a11y-moda site http://localhost:3000 --level AA --max-pages 30 --render --render-crawl --allow-private-hosts --format json
+```
+
+Always parse JSON. Never rely on exit code to detect violations — read
+`summary.fail` (or per-page `issues[].status == "fail"`).
+
+## Triage rules
+
+| `status` | Action |
+|---|---|
+| `fail` | Confirmed violation. Fix in code. |
+| `caveat` / `needs_human` | AST/runtime cannot conclude. Surface as "needs review"; **do NOT** auto-fix. Common causes: cross-file wiring lint can't see; third-party CSS; LLM unavailable. |
+| `info` | Stylistic. Mention only if relevant. |
+| `pass` / `not_applicable` | Don't surface. |
+
+If a `caveat` message starts with `[third-party: <origin>] `, the
+violation is in code from `<origin>` (e.g. `googleapis.com`). Tell the
+user to declare in MODA 申請備註欄 (WCAG 2.1 §5.4 Partial Conformance).
+**Do NOT** edit `node_modules/<origin>/...` — they didn't ship that code.
+
+## Anti-patterns (do NOT)
+
+- Recommend editing JSX for `scan` issues without first running `lint`
+  (lint is faster and catches the same source-level subset).
+- Add `--probe-modals` on production URLs (can trigger booking / billing
+  / analytics events).
+- Auto-install playwright. The CLI prints a clear install command if
+  `--render` needs it; let the user run it.
+- Suggest setting up an LLM endpoint before scanning. LLM is optional;
+  ~70% of AAA rules + 100% of A/AA rules run without it.
+- Recommend `eslint-plugin-jsx-a11y` over `a11y-moda lint`. Use them
+  together — eslint plugin has no MODA rule_id mapping; a11y-moda does.

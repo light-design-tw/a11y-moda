@@ -1,0 +1,19 @@
+# a11y-moda — Aider integration
+#
+# Place this file at your repo root as `.aider.conf.yml`. Aider auto-loads
+# it. The `read:` key tells Aider to include the listed file(s) as context
+# for every chat session in this repo.
+
+read:
+  - docs/AI_INTEGRATION.md     # if you've copied a11y-moda's spec into your repo
+  # - .aider/a11y-moda-rules.md  # alternative: a local cheat-sheet you maintain
+
+# After Aider chats, run this lint pass on staged changes (Aider runs it
+# via its `lint-cmd` hook). Fast, no browser, no LLM. Catches MODA
+# accessibility issues introduced by the previous edit.
+lint-cmd:
+  tsx: a11y-moda lint --level AA --format md
+  jsx: a11y-moda lint --level AA --format md
+  ts:  a11y-moda lint --level AA --format md
+  js:  a11y-moda lint --level AA --format md
+  html: a11y-moda lint --level AA --format md

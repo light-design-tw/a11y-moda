@@ -1,6 +1,6 @@
 [project]
 name = "a11y-moda"
-version = "0.2.1"
+version = "0.3.0"
 description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
 license = "MIT"
@@ -29,7 +29,6 @@ dependencies = [
     "beautifulsoup4>=4.12,<5.0",
     "lxml>=6.1,<7.0",            # CVE-2026-41066 (XXE) fixed in 6.1
     "click>=8.1,<9.0",
-    "playwright>=1.59,<2.0",     # CVE-2026-2441 Chromium use-after-free patched in 1.59
     "wcag-contrast-ratio>=0.9,<1.0",
     "tinycss2>=1.3,<2.0",
     "defusedxml>=0.7,<1.0",
@@ -38,6 +37,17 @@ dependencies = [
     "tree-sitter-typescript>=0.23,<0.24",
     "tree-sitter-html>=0.23,<0.24",
     "pathspec>=0.12,<1.0",
+]
+
+[project.optional-dependencies]
+# Browser-based scan / site command + --render flag. Lint command does
+# not need this — pure tree-sitter AST. ~290MB extra (playwright pkg +
+# Chromium binary). Install with: pip install 'a11y-moda[scan]'
+scan = [
+    "playwright>=1.59,<2.0",     # CVE-2026-2441 Chromium use-after-free patched in 1.59
+]
+all = [
+    "playwright>=1.59,<2.0",
 ]
 
 [project.urls]

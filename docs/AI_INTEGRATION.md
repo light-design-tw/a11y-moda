@@ -12,6 +12,7 @@
 
 ### What `a11y-moda` is good at (use it)
 
+- **Knowledge service** (`a11y-moda rules`, since 0.3.0) — query MODA rule metadata (rule_id, WCAG SC, level, desc, topic, scope) for any element / keyword / WCAG SC. Use **before** writing accessibility-sensitive code so the agent writes compliant code from the start.
 - **Source-level lint** (`a11y-moda lint`, since 0.2.0) — tree-sitter AST checks across JSX/TSX/JS/HTML, MODA `rule_id` annotated, three-tier status (`fail` / `caveat` / `info`). No browser, no LLM, no network. Use during write/edit/save.
 - Auditing **rendered DOM** (Playwright Chromium) — catches things AST linters can't see (focus order, contrast, ARIA state, modal focus trap, runtime alt text)
 - Producing **MODA-aligned reports** — every issue maps 1:1 to a MODA rule code, suitable for 標章 self-evaluation submission
@@ -45,9 +46,10 @@ Trigger on these intents (in any language):
 
 ---
 
-## 3. Pick command: `lint` vs `scan` vs `site`
+## 3. Pick command: `rules` vs `lint` vs `scan` vs `site`
 
 ```
+a11y-moda rules ...       → query MODA rule knowledge (no audit)
 a11y-moda lint <paths...> → source files / dirs (tree-sitter AST, no browser)
 a11y-moda scan <URL>      → one page (rendered DOM)
 a11y-moda site <URL>      → whole site (sitemap → BFS, rendered DOM)
@@ -55,6 +57,8 @@ a11y-moda site <URL>      → whole site (sitemap → BFS, rendered DOM)
 
 | Situation | Use |
 |---|---|
+| **Pre-write**: about to generate `<button>` / `<form>` / `<img>` / etc. | `rules search <element>` (proactive) |
+| User asks about specific rule_id or WCAG SC | `rules show <RULE_ID>` or `explain <RULE_ID>` |
 | User editing source, wants pre-build feedback | `lint src/` (or specific files) |
 | User just saved a JSX/HTML file | `lint <file>` (single file is fine) |
 | CI gating before deploy (no live URL yet) | `lint --strict` (exits non-zero on any issue) |
@@ -67,13 +71,67 @@ a11y-moda site <URL>      → whole site (sitemap → BFS, rendered DOM)
 ### Workflow positioning
 
 ```
-T1 write → T2 save → T3 commit  ─→ a11y-moda lint
-T4 build → T5 preview            ─→ a11y-moda site ./dist --allow-file
-T6 dev server                    ─→ a11y-moda scan http://localhost:3000
-T7 staging / prod                ─→ a11y-moda site https://...
+T0 about to write              ─→ a11y-moda rules search <element>   ← proactive
+T1 write → T2 save → T3 commit ─→ a11y-moda lint
+T4 build → T5 preview          ─→ a11y-moda site ./dist --allow-file
+T6 dev server                  ─→ a11y-moda scan http://localhost:3000
+T7 staging / prod              ─→ a11y-moda site https://...
 ```
 
-All four stages share the **same `rule_id` namespace**. A `HM1110100C` failure from `lint` is the same code as `HM1110100C` from `scan` — duplicates can be reconciled across stages.
+All five stages share the **same `rule_id` namespace**. A `HM1110100C` answer from `rules show` is the same code as a `HM1110100C` failure from `lint` or `scan` — agents can pivot from "what should I do" (T0) to "did I do it right" (T1+) without re-mapping IDs.
+
+---
+
+### 3.5 `rules` subcommand (knowledge service, since 0.3.0)
+
+```bash
+# List
+a11y-moda rules list                                  # all 129 rules (compact MD)
+a11y-moda rules list --level AAA --format json
+a11y-moda rules list --topic forms                    # by topic dir
+a11y-moda rules list --source extension               # E rules only
+a11y-moda rules list --scope lint                     # lint-implementable
+
+# Show / explain (alias)
+a11y-moda rules show HM1110100C --format json
+a11y-moda explain HM1110100C --format json            # short alias
+
+# Search (English aliases work; matches rule_id, desc, WCAG SC, topic)
+a11y-moda rules search button --format json
+a11y-moda rules search 1.1.1 --format json
+a11y-moda rules search alt --format json
+```
+
+JSON shape per rule:
+
+```json
+{
+  "rule_id": "HM1110100C",
+  "guideline": "1.1.1",
+  "level": 1,
+  "level_name": "A",
+  "desc": "圖片<img>組件需有替代文字(alt)屬性",
+  "source": "freego",
+  "runtime_authoritative": false,
+  "wcag_url": "https://www.w3.org/WAI/WCAG21/quickref/#sc-1-1-1",
+  "topic": "images",
+  "scope": ["scan", "lint"]
+}
+```
+
+Field reference: see §5 Field reference table below; `rules` adds:
+- `level_name` — `"A"` / `"AA"` / `"AAA"` string form
+- `topic` — directory under `codes/` (e.g. `forms`, `aria`, `images`)
+- `scope` — list of stages this rule_id is implemented in (`scan` and/or `lint`)
+- `runtime_authoritative` — when `true`, lint downgrades `fail` → `caveat` (since 0.2.1) because AST cannot prove the violation; scan still emits `fail` authoritatively
+- `wcag_url` — WAI Quickref anchor for the WCAG SC
+
+**Search English aliases** (built-in mapping to zh-TW desc substrings):
+`button`, `link`, `form`, `input`, `label`, `image`/`img`, `video`,
+`audio`, `iframe`, `table`, `heading`, `lang`, `alt`, `aria`, `role`,
+`focus`, `keyboard`, `color`/`contrast`, `modal`/`dialog`,
+`navigation`/`landmark`, `skip`, `title`, `meta`. Unrecognised English
+keywords fall through to literal substring search.
 
 ---
 
@@ -81,7 +139,41 @@ All four stages share the **same `rule_id` namespace**. A `HM1110100C` failure f
 
 Apply rules in order. Stop at first matching rule.
 
-### 4.0 Lint flags (subset; lint is simpler than scan/site)
+### 4.0 Install variants (since 0.3.0 — lint is lightweight)
+
+```bash
+# Lightweight: lint + rules subcommand (default; ~30MB)
+pip install a11y-moda
+
+# Browser-based scan / site / --render
+pip install 'a11y-moda[scan]'
+playwright install chromium       # ~200MB Chromium binary
+```
+
+Since 0.3.0, Playwright is an **optional extra**. `lint` and `rules` need
+none of it. `scan`, `site`, `--render`, `--render-crawl`, `--probe-modals`,
+`tools/contrast.py`, `tools/tab_walk.py` all need `[scan]` extras.
+
+**Behavior when `[scan]` not installed**:
+
+```
+$ a11y-moda scan https://example.com --render
+
+ERROR: scan --render needs Playwright + Chromium (not installed).
+
+Install (one-time, ~290MB):
+    pip install 'a11y-moda[scan]'
+    playwright install chromium
+
+Or skip rendering:
+    a11y-moda scan <URL>          (no --render)
+    a11y-moda site <URL>          (no --render / --render-crawl)
+    a11y-moda lint <PATH>         (source-level, no browser ever)
+```
+
+**Agents must NOT auto-install**. The user runs the printed command.
+
+### 4.0.1 Lint flags (subset; lint is simpler than scan/site)
 
 ```
 a11y-moda lint <paths...>
@@ -452,21 +544,34 @@ Process env vars (shell `export`, Docker `-e`, CI runner) always win over `.env`
 
 ## 11. Platform quickstarts
 
-### 11.1 Claude Code (Skill)
+Each example directory in `examples/` ships a ready-to-copy config that
+matches that platform's auto-loaded location. All examples teach the
+same proactive pattern: query `a11y-moda rules` BEFORE writing
+a11y-sensitive elements; run `lint` / `scan` / `site` AFTER.
 
-If using Claude Code, install the bundled skill:
+| Platform | Example | Path in your repo |
+|---|---|---|
+| Claude Code | [`examples/claude-code-skill/`](../examples/claude-code-skill/) | `~/.claude/skills/a11y-moda/` |
+| Cursor | [`examples/cursor/`](../examples/cursor/) | `<repo-root>/.cursorrules` |
+| GitHub Copilot Chat | [`examples/copilot/`](../examples/copilot/) | `<repo-root>/.github/copilot-instructions.md` |
+| Aider | [`examples/aider/`](../examples/aider/) | `<repo-root>/.aider.conf.yml` |
+| Generic LLM agent (Cline, Continue, RooCode, custom) | [`examples/generic-agent/`](../examples/generic-agent/) | Pin into agent system prompt |
+
+### 11.1 Claude Code (Skill)
 
 ```bash
 cp -r examples/claude-code-skill ~/.claude/skills/a11y-moda
 ```
 
-Then in Claude Code, invoke with `/a11y-moda` or natural-language triggers ("check a11y", "MODA 標章驗"). The skill auto-detects dev server context, picks flags per §4, runs, and applies §6 triage.
+Then in Claude Code, invoke with `/a11y-moda` or natural-language triggers ("check a11y", "MODA 標章驗", or about specific rule_id). The skill detects intent (knowledge query / lint / scan / site), picks flags per §4, runs, and applies §6 triage.
 
 See [`examples/claude-code-skill/README.md`](../examples/claude-code-skill/README.md).
 
 ### 11.2 Cursor
 
-Add to `.cursorrules` at project root:
+**Recommended (since v0.3.0)**: copy [`examples/cursor/.cursorrules`](../examples/cursor/.cursorrules) to your repo root. Includes pre-write rule lookup + lint/scan invocation patterns + triage rules.
+
+Inline minimal version (older / custom) below:
 
 ```
 # a11y-moda integration
@@ -502,7 +607,9 @@ or 無障礙檢查, use the `a11y-moda` CLI:
 
 ### 11.3 Aider
 
-Add to `.aider.conf.yml`:
+**Recommended (since v0.3.0)**: copy [`examples/aider/.aider.conf.yml`](../examples/aider/.aider.conf.yml) to your repo root. Includes `lint-cmd:` hook so Aider auto-lints after each edit.
+
+Inline minimal version (older / custom):
 
 ```yaml
 read:
@@ -522,7 +629,9 @@ a11y-moda scan "$url" --level AA --render --allow-private-hosts --format json
 
 ### 11.4 GitHub Copilot
 
-Add to `.github/copilot-instructions.md` at your repo root. Copilot Chat auto-loads this file as context when you chat in this repo:
+**Recommended (since v0.3.0)**: copy [`examples/copilot/.github/copilot-instructions.md`](../examples/copilot/.github/copilot-instructions.md) to your repo's matching path.
+
+Inline minimal version (older / custom) — add to `.github/copilot-instructions.md` at your repo root. Copilot Chat auto-loads this file as context when you chat in this repo:
 
 ```markdown
 # a11y-moda integration
@@ -586,7 +695,11 @@ For full reference: https://github.com/light-design-tw/a11y-moda/blob/main/docs/
 
 > **Note**: Copilot does not have a "skill" mechanism equivalent to Claude Code's `SKILL.md`. The `.github/copilot-instructions.md` file is the closest equivalent — it's auto-loaded as context for Copilot Chat sessions in that repo. For Copilot Workspace and Copilot Skillsets (REST-endpoint integrations), see the project roadmap; not currently shipped.
 
-### 11.5 Plain shell / generic agent
+### 11.5 Generic LLM agent (Cline, Continue, RooCode, custom)
+
+**Recommended (since v0.3.0)**: pin [`examples/generic-agent/AGENT.md`](../examples/generic-agent/AGENT.md) into the agent's system prompt / instructions. Covers pre-write rule lookup, lint/scan/site invocation, triage, and anti-patterns in one platform-agnostic doc.
+
+### 11.6 Plain shell
 
 Minimal pattern any agent can use:
 

@@ -318,6 +318,9 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
          llm_concurrency: int,
          fmt: str, output: str | None) -> None:
     """Scan a single URL."""
+    if render:
+        from .fetcher import ensure_playwright_or_die
+        ensure_playwright_or_die("scan --render")
     url = _resolve_url(url, allow_file=allow_file)
     _enforce_url_safety(url, allow_private=allow_private_hosts, allow_file=allow_file)
     sources = {"freego"} if (freego_only or no_extension) else None
@@ -396,6 +399,12 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          llm_concurrency: int,
          group_by: str, fmt: str, output: str | None) -> None:
     """Discover and scan a whole site."""
+    if render or render_crawl:
+        from .fetcher import ensure_playwright_or_die
+        flag = "--render" if render and not render_crawl else (
+            "--render-crawl" if render_crawl and not render else "--render / --render-crawl"
+        )
+        ensure_playwright_or_die(f"site {flag}")
     start_url = _resolve_url(start_url, allow_file=allow_file)
     _enforce_url_safety(start_url, allow_private=allow_private_hosts, allow_file=allow_file)
     if start_url.startswith("file://"):
@@ -441,6 +450,269 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
     else:
         text = scan_to_html(scan_report, title=f"Site scan: {start_url}")
     _write(text, output)
+
+
+# ---------------------------------------------------------------------------
+# `rules` subcommand group — query MODA accessibility rule knowledge.
+# ---------------------------------------------------------------------------
+#
+# Lets AI agents (Cursor, Copilot, Aider, Claude Code, custom agents) query
+# the rule registry without parsing scan/lint output. Two consumption modes:
+#
+#   1. Pre-write: agent about to write <button>, <form>, etc. queries
+#      relevant rules first → writes accessible code from the start.
+#   2. Post-edit: agent receives a lint issue with rule_id → queries
+#      `rules show <id>` for full context, fix guidance, MODA mapping.
+#
+# Both scan + lint registries are unioned. A rule_id appearing in both gets
+# `scope: ["scan", "lint"]`. `runtime_authoritative` reflects the lint side
+# when present (since 0.2.1 only lint inspects this flag).
+
+def _all_rules_metadata() -> list[dict]:
+    """Union scan + lint rule registries, return list of metadata dicts.
+
+    Each entry has 9 fields:
+      rule_id, guideline, level (int), level_name, desc, source,
+      runtime_authoritative, wcag_url, topic, scope (list of "scan" / "lint")
+    """
+    from .rules import all_rules
+    from .lint.base import all_lint_rules
+
+    out: dict[str, dict] = {}
+
+    def _topic_from_module(mod_name: str) -> str:
+        # a11y_moda.rules.codes.aria.AR2410300E → aria
+        # a11y_moda.lint.codes.keyboard.GN1210100E → keyboard
+        parts = mod_name.split(".")
+        return parts[-2] if len(parts) >= 2 else "misc"
+
+    def _wcag_url(guideline: str) -> str:
+        # WAI Quickref anchors by SC number — works for all 2.1 SC. Avoids
+        # the Understanding/<name> URL format which requires per-SC name
+        # lookup we don't maintain.
+        slug = guideline.replace(".", "-")
+        return f"https://www.w3.org/WAI/WCAG21/quickref/#sc-{slug}"
+
+    def _record(rule, scope: str) -> None:
+        rid = rule.meta.rule_id
+        topic = _topic_from_module(type(rule).__module__)
+        runtime_auth = getattr(rule.meta, "runtime_authoritative", False)
+        if rid in out:
+            if scope not in out[rid]["scope"]:
+                out[rid]["scope"].append(scope)
+            if runtime_auth:
+                out[rid]["runtime_authoritative"] = True
+            return
+        out[rid] = {
+            "rule_id": rid,
+            "guideline": rule.meta.guideline,
+            "level": int(rule.meta.level),
+            "level_name": rule.meta.level.name,
+            "desc": rule.meta.desc,
+            "source": rule.meta.source,
+            "runtime_authoritative": runtime_auth,
+            "wcag_url": _wcag_url(rule.meta.guideline),
+            "topic": topic,
+            "scope": [scope],
+        }
+
+    for r in all_rules():
+        _record(r, "scan")
+    for r in all_lint_rules():
+        _record(r, "lint")
+
+    return sorted(out.values(), key=lambda d: d["rule_id"])
+
+
+# English element / concept → zh-TW substring(s) appearing in rule descriptions.
+# Lets agents query with English (`button`, `form`, `image`) and find the
+# Chinese-described rule. Keep tight — only common a11y-relevant elements.
+_SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
+    "button": ("按鈕", "button", "btn"),
+    "link": ("連結", "link", "a 元素", "<a"),
+    "form": ("表單", "form"),
+    "input": ("輸入", "input", "欄位"),
+    "label": ("標籤", "label"),
+    "image": ("圖片", "image", "img"),
+    "img": ("圖片", "img"),
+    "video": ("影片", "video"),
+    "audio": ("音訊", "audio", "音檔"),
+    "iframe": ("iframe", "內嵌"),
+    "table": ("表格", "table"),
+    "heading": ("標題", "heading", "h1", "h2", "h3"),
+    "lang": ("語言", "lang"),
+    "alt": ("替代文字", "alt"),
+    "aria": ("aria", "role"),
+    "role": ("role", "aria"),
+    "focus": ("焦點", "focus"),
+    "keyboard": ("鍵盤", "keyboard"),
+    "color": ("色彩", "顏色", "對比"),
+    "contrast": ("對比", "contrast"),
+    # Corpus has no rule specifically for <dialog>/<modal>; nearest a11y
+    # concepts are alert/status (aria-live) + focus management.
+    "modal": ("alert", "aria-live", "焦點", "status"),
+    "dialog": ("alert", "aria-live", "焦點", "status"),
+    "navigation": ("導覽", "navigation", "nav"),
+    "landmark": ("landmark", "地標", "main", "header", "footer"),
+    "skip": ("略過", "skip"),
+    "title": ("title", "標題"),
+    "meta": ("meta", "metadata"),
+}
+
+
+def _filter_rules(rules: list[dict], *, level: str | None, topic: str | None,
+                  source: str | None, scope: str | None,
+                  search: str | None) -> list[dict]:
+    out = rules
+    if level:
+        max_lv = {"A": 1, "AA": 2, "AAA": 3}[level]
+        out = [r for r in out if r["level"] <= max_lv]
+    if topic:
+        out = [r for r in out if r["topic"] == topic]
+    if source:
+        out = [r for r in out if r["source"] == source]
+    if scope:
+        out = [r for r in out if scope in r["scope"]]
+    if search:
+        q = search.lower()
+        # Expand English keyword to alias substrings if registered.
+        terms = list(_SEARCH_ALIASES.get(q, (q,)))
+        # Always include the raw query so partial / multi-word still matches.
+        if q not in terms:
+            terms.append(q)
+        out = [r for r in out
+               if any(t in r["rule_id"].lower()
+                      or t in r["desc"].lower()
+                      or t in r["guideline"]
+                      or t in r["topic"]
+                      for t in terms)]
+    return out
+
+
+def _rules_to_md(rules: list[dict], *, full: bool = False) -> str:
+    """Markdown table for terminal-friendly output."""
+    if not rules:
+        return "_(no rules match)_"
+    if full:
+        # one section per rule
+        chunks = []
+        for r in rules:
+            chunks.append(
+                f"### `{r['rule_id']}` — {r['desc']}\n\n"
+                f"- **WCAG SC**: {r['guideline']} ([Understanding]({r['wcag_url']}))\n"
+                f"- **Level**: {r['level_name']}\n"
+                f"- **Topic**: {r['topic']}\n"
+                f"- **Source**: {r['source']}\n"
+                f"- **Scope**: {', '.join(r['scope'])}\n"
+                f"- **runtime_authoritative**: {r['runtime_authoritative']}\n"
+            )
+        return "\n".join(chunks)
+    # compact table
+    lines = ["| rule_id | WCAG | Level | Topic | Scope | Description |",
+             "|---|---|---|---|---|---|"]
+    for r in rules:
+        scope_str = "+".join(r["scope"])
+        lines.append(
+            f"| `{r['rule_id']}` | {r['guideline']} | {r['level_name']} | "
+            f"{r['topic']} | {scope_str} | {r['desc']} |"
+        )
+    return "\n".join(lines)
+
+
+@main.group()
+def rules() -> None:
+    """Query MODA accessibility rule knowledge (no audit; just metadata).
+
+    For AI agents writing accessible code: query rules BEFORE writing
+    interactive elements, not just after lint reports an issue. See
+    `examples/` for IDE integration patterns (Cursor, Copilot, Aider).
+    """
+
+
+@rules.command("list")
+@click.option("--level", type=click.Choice(["A", "AA", "AAA"]), default=None,
+              help="Max compliance level to include (A < AA < AAA). "
+                   "Omit to list all levels.")
+@click.option("--topic", default=None,
+              help="Filter by topic directory under codes/ (e.g. forms, aria, "
+                   "keyboard, images, headings, links, lang, meta, navigation, "
+                   "media, focus, presentation, structure, tables, responsive).")
+@click.option("--source", type=click.Choice(["freego", "extension"]), default=None,
+              help="freego = Freego machine-checked rule (C suffix); "
+                   "extension = E rule we automated.")
+@click.option("--scope", type=click.Choice(["scan", "lint"]), default=None,
+              help="Only rules implemented in this stage's runner.")
+@click.option("--search", default=None,
+              help="Substring match in rule_id / desc / guideline / topic.")
+@click.option("--format", "fmt", type=click.Choice(["json", "md"]), default="md")
+@click.option("--output", "-o", type=click.Path(), default=None)
+def rules_list(level: str | None, topic: str | None, source: str | None,
+               scope: str | None, search: str | None,
+               fmt: str, output: str | None) -> None:
+    """List rules matching filters. Default: all 129 rules in compact table."""
+    rs = _filter_rules(_all_rules_metadata(), level=level, topic=topic,
+                       source=source, scope=scope, search=search)
+    if fmt == "json":
+        text = json.dumps({"count": len(rs), "rules": rs},
+                          ensure_ascii=False, indent=2)
+    else:
+        header = (f"# a11y-moda rules — {len(rs)} match\n\n"
+                  f"_Filters: level={level} topic={topic} source={source} "
+                  f"scope={scope} search={search!r}_\n\n")
+        text = header + _rules_to_md(rs)
+    _write(text, output)
+
+
+@rules.command("show")
+@click.argument("rule_id")
+@click.option("--format", "fmt", type=click.Choice(["json", "md"]), default="md")
+@click.option("--output", "-o", type=click.Path(), default=None)
+def rules_show(rule_id: str, fmt: str, output: str | None) -> None:
+    """Show detailed metadata for one rule_id."""
+    rs = [r for r in _all_rules_metadata() if r["rule_id"] == rule_id]
+    if not rs:
+        click.echo(f"ERROR: no rule with id {rule_id!r}. "
+                   "Try `a11y-moda rules list` to browse all.", err=True)
+        sys.exit(2)
+    if fmt == "json":
+        text = json.dumps(rs[0], ensure_ascii=False, indent=2)
+    else:
+        text = _rules_to_md(rs, full=True)
+    _write(text, output)
+
+
+@rules.command("search")
+@click.argument("query")
+@click.option("--format", "fmt", type=click.Choice(["json", "md"]), default="md")
+@click.option("--output", "-o", type=click.Path(), default=None)
+def rules_search(query: str, fmt: str, output: str | None) -> None:
+    """Substring search across rule_id, description, WCAG SC, topic.
+
+    Examples:
+      a11y-moda rules search button
+      a11y-moda rules search 1.1.1
+      a11y-moda rules search alt
+    """
+    rs = _filter_rules(_all_rules_metadata(), level=None, topic=None,
+                       source=None, scope=None, search=query)
+    if fmt == "json":
+        text = json.dumps({"query": query, "count": len(rs), "rules": rs},
+                          ensure_ascii=False, indent=2)
+    else:
+        header = f"# a11y-moda rules — search {query!r} ({len(rs)} match)\n\n"
+        text = header + _rules_to_md(rs)
+    _write(text, output)
+
+
+# Top-level alias for `rules show <RULE_ID>` — short and direct.
+@main.command("explain")
+@click.argument("rule_id")
+@click.option("--format", "fmt", type=click.Choice(["json", "md"]), default="md")
+@click.option("--output", "-o", type=click.Path(), default=None)
+@click.pass_context
+def explain(ctx: click.Context, rule_id: str, fmt: str, output: str | None) -> None:
+    """Alias for `rules show <RULE_ID>` — short form."""
+    ctx.invoke(rules_show, rule_id=rule_id, fmt=fmt, output=output)
 
 
 def _resolve_fmt(fmt: str, output: str | None) -> str:

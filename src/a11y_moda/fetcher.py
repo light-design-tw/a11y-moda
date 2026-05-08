@@ -20,6 +20,32 @@ from ._security import require_safe_http_url, UnsafeURLError
 from . import USER_AGENT as _DEFAULT_UA
 
 
+def ensure_playwright_or_die(reason: str = "this command") -> None:
+    """Verify playwright is importable. Exit with friendly install message if not.
+
+    Used by CLI when a render-requiring path is selected (--render / --render-crawl)
+    so users see a single clear install instruction rather than N per-page
+    `fetch_error: playwright not installed` lines.
+    """
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        import sys
+        sys.stderr.write(
+            f"\nERROR: {reason} needs Playwright + Chromium (not installed).\n\n"
+            "Since v0.3.0, Playwright is an optional dependency to keep the\n"
+            "default install lightweight (lint command needs none of it).\n\n"
+            "Install (one-time, ~290MB):\n"
+            "    pip install 'a11y-moda[scan]'\n"
+            "    playwright install chromium\n\n"
+            "Or skip rendering (some checks won't run):\n"
+            "    a11y-moda scan <URL>          (no --render)\n"
+            "    a11y-moda site <URL>          (no --render / --render-crawl)\n"
+            "    a11y-moda lint <PATH>         (source-level, no browser ever)\n"
+        )
+        sys.exit(2)
+
+
 def _read_local_file(url: str) -> tuple[int, str, str]:
     """Read a file:// URL from disk. Returns (status_code, html, error).
 
@@ -120,7 +146,10 @@ def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
     try:
         from .tools._session import standalone_page
     except ImportError:
-        report.fetch_error = "playwright not installed (pip install playwright && playwright install chromium)"
+        report.fetch_error = (
+            "playwright not installed — install: "
+            "pip install 'a11y-moda[scan]' && playwright install chromium"
+        )
         return report, None, "", None, None
     try:
         with standalone_page(ua=ua) as page:

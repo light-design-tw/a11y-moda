@@ -1,6 +1,7 @@
 ---
 name: a11y-moda
-description: Run a Taiwan MODA WCAG accessibility audit on a web page or whole site using the a11y-moda CLI. Triggers on requests like "check a11y", "audit accessibility", "WCAG check", "無障礙檢查", "MODA 標章驗證", "AAA 自評", and similar accessibility verification asks. Auto-detects SPA/dev-server context, picks correct CLI flags, parses JSON output, separates third-party caveats from fixable failures, and offers a fix → re-verify loop.
+description: Taiwan MODA accessibility CLI — query MODA rule knowledge before writing a11y-sensitive elements (buttons, forms, images, ARIA), audit source code (lint), and audit rendered DOM (scan/site). Triggers on "check a11y", "audit accessibility", "WCAG check", "無障礙檢查", "MODA 標章", "AAA 自評", and on questions about specific MODA rule_id (HM/GN/CS/AR/FA/SC) or WCAG SC numbers.
+argument-hint: "[query | <RULE_ID> | <URL> | <path>]"
 allowed-tools:
   - Bash
   - Read
@@ -8,10 +9,16 @@ allowed-tools:
   - Edit
 ---
 
-# a11y-moda — MODA WCAG Audit Skill
+# a11y-moda — MODA WCAG Audit + Knowledge Skill
 
-Run the `a11y-moda` Python CLI against the user's web target, parse its JSON,
-present findings in zh-TW Markdown, and offer a fix → re-verify loop.
+Two roles:
+
+1. **Knowledge service** — query `a11y-moda rules` for MODA rule
+   metadata BEFORE writing a11y-sensitive code. Proactive, no audit.
+2. **Audit** — run `a11y-moda lint` (source) / `scan` (page) / `site`
+   (whole site) to find violations in existing code.
+
+The same `rule_id` namespace (HM/GN/CS/AR/FA/SC) spans both roles.
 
 **For edge cases not covered here, Read `REFERENCE.md` in this skill directory.**
 
@@ -28,10 +35,15 @@ command -v a11y-moda
 If missing, tell user (don't try to install for them):
 
 ```
-a11y-moda not installed. Install with:
-    pip install a11y-moda
-    playwright install chromium    # one-time, required for --render
+a11y-moda not installed. Install:
+    pip install a11y-moda                # lint + rules subcommand only (~30MB)
+    pip install 'a11y-moda[scan]'        # add browser-based scan/site
+    playwright install chromium          # required for --render
 ```
+
+Since v0.3.0, Playwright is an **optional** extra. Lint + rules
+subcommand work with the lightweight install. Don't push users to
+install `[scan]` unless they're asking for `scan` / `site` / `--render`.
 
 ---
 
@@ -39,13 +51,66 @@ a11y-moda not installed. Install with:
 
 | User says | Scope |
 |---|---|
-| "lint my source" / "check my JSX" / "before commit" / "while I'm coding" | `lint` (§2a) |
-| One URL / one page / `/path` | `scan` |
-| "Whole site" / "every page" / "MODA 標章" | `site` |
+| "What MODA rules apply to `<button>`?" / "show HM1110100C" / "AAA rules for forms" / "WCAG 1.1.1 對應" | `rules` (§2a — knowledge query) |
+| About to write a11y-sensitive JSX/HTML element | `rules` first (proactive lookup) → write code |
+| "lint my source" / "check my JSX" / "before commit" / "while I'm coding" | `lint` (§2b) |
+| One URL / one page / `/path` | `scan` (§2b) |
+| "Whole site" / "every page" / "MODA 標章" | `site` (§2b) |
 | Ambiguous, source repo present, no live URL given | Default `lint` first (fast feedback) |
 | Ambiguous, URL or path given | Default `scan`; offer to escalate to `site` after results |
 
-### 2a. Lint scope (since 0.2.0)
+### 2a. Rules / knowledge query (since 0.3.0)
+
+Two ways to use:
+
+**Pre-write proactive** — before generating any of these JSX/HTML
+elements, query MODA rules first to write compliant code from the start:
+
+```
+<button>, <a href|onClick>, <form>, <input>, <textarea>, <select>, <label>,
+<img>, <video>, <audio>, <iframe>, <picture>, <source>,
+<table> (data tables), <dialog>, <details>, <summary>,
+<svg> (interactive only),
+ANY element with role=*, aria-*, tabindex
+```
+
+Trigger: when about to write code matching above. Run:
+
+```bash
+a11y-moda rules search <element-keyword> --format json
+# English aliases work: button, form, image, dialog, table, focus, aria...
+```
+
+**Reactive lookup** — user asks about a rule_id or WCAG SC:
+
+```bash
+a11y-moda rules show HM1110100C --format json
+a11y-moda explain HM1110100C --format json    # short alias
+
+a11y-moda rules search 1.1.1 --format json    # by WCAG SC
+a11y-moda rules list --topic forms --level AA --format json
+```
+
+JSON includes: `rule_id`, `guideline`, `level`, `level_name`, `desc`,
+`source` (freego/extension), `runtime_authoritative`, `wcag_url`,
+`topic`, `scope` (scan/lint).
+
+**MODA 編碼速查** — let LLM infer rule_id from element type:
+
+```
+HM = HTML / 內容結構       e.g. HM1110100C = SC 1.1.1 第 100 條 (img alt)
+GN = 一般 / Gateway        e.g. GN1210100E = SC 2.1.1 (keyboard equiv)
+CS = CSS / 樣式            e.g. CS1110113E (decorative img via CSS)
+AR = ARIA                   e.g. AR2410300E (status / aria-live)
+FA = Focus / Form A         e.g. FA2141104E (outline:none + :focus 替代)
+SC = Success Criterion 級   一般少用，主要在 docs
+
+C suffix = Freego 機器規則 / E suffix = extension 人工判斷
+```
+
+LLM 知道用戶寫 `<img>` → 推 `HM111` 開頭 → 跑 `a11y-moda rules search image --format json` 取確切細節。
+
+### 2b. Lint scope (since 0.2.0)
 
 `lint` is **source-level static analysis** — tree-sitter AST over JSX/TSX/JS/HTML. No browser, no LLM, no network. Fast (sub-second on typical components). Use when:
 

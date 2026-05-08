@@ -7,6 +7,84 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-08
+
+**BREAKING**: Playwright is no longer installed by default. The default
+install (`pip install a11y-moda`) now ships only `lint` + `rules`
+subcommand dependencies (~30MB). To use `scan` / `site` / `--render` /
+`--render-crawl` / `--probe-modals`, install the `[scan]` extra:
+
+```
+pip install 'a11y-moda[scan]'
+playwright install chromium
+```
+
+Existing users who upgrade and then run `--render` will see a clear
+install message printed to stderr; the CLI does not auto-install.
+
+### Reframing — knowledge service
+
+a11y-moda repositions from "audit CLI" to **"audit CLI + queryable MODA
+rule knowledge service"**. The new `rules` subcommand exposes the
+internal rule registry as a queryable API for AI agents (any IDE /
+agent that can call CLI tools), so the agent can lookup MODA rules
+**before** writing accessibility-sensitive code instead of only after
+lint complains. Cross-platform by design — works with Cursor, GitHub
+Copilot, Aider, Claude Code, Cline, Continue, custom agents.
+
+### Added
+
+- **`a11y-moda rules` subcommand group** — query MODA rule metadata.
+  Three subcommands: `list`, `show`, `search`. JSON / Markdown output.
+  Filters: `--level`, `--topic`, `--source` (freego/extension),
+  `--scope` (scan/lint), `--search`. English keyword aliases for
+  search (`button` / `form` / `image` / `dialog` / etc. map to zh-TW
+  desc substrings).
+- **`a11y-moda explain <RULE_ID>`** — short alias for `rules show`.
+- **9-field rule metadata** — `rule_id`, `guideline`, `level`,
+  `level_name`, `desc`, `source`, `runtime_authoritative`, `wcag_url`
+  (WAI Quickref anchor), `topic` (codes/ subdir), `scope` (list of
+  stages: scan/lint).
+- **`examples/cursor/.cursorrules`** — Cursor integration.
+- **`examples/copilot/.github/copilot-instructions.md`** — GitHub
+  Copilot Chat integration.
+- **`examples/aider/.aider.conf.yml`** — Aider integration with
+  `lint-cmd:` hook.
+- **`examples/generic-agent/AGENT.md`** — platform-agnostic
+  instructions for any LLM agent (Cline, Continue, RooCode, custom).
+- **SKILL.md** — `argument-hint`, knowledge-query section, MODA 編碼
+  速查 (HM/GN/CS/AR/FA/SC + C/E suffix decoder).
+- Workflow positioning expanded from T1–T7 to T0–T7 (T0 = pre-write
+  rule lookup).
+
+### Changed (BREAKING)
+
+- `pyproject.toml` `dependencies` no longer includes `playwright`.
+  Moved to `optional-dependencies.scan` and `optional-dependencies.all`.
+- CLI `scan` / `site` early-exit with friendly install message when
+  `--render` / `--render-crawl` selected and Playwright not importable.
+  `lint` and `rules` unaffected.
+
+### Notes
+
+- **Why no MCP server yet**: `rules` subcommand + system-prompt
+  examples (Layer 2 of cross-IDE strategy) ship first to validate the
+  "edit-time query" workflow with the lowest-risk approach. MCP server
+  (Layer 1, native tool integration) deferred to v0.4.0 pending real
+  usage signal.
+- **Why no auto-install**: industry consensus (pytest plugins, ruff,
+  black, even Playwright itself) is to print a clear install command
+  and let the user run it. Auto-install causes permission, network,
+  and reproducibility issues. AI agents that read stderr will run the
+  printed command on the user's behalf.
+- **Knowledge query is proactive, not reactive**: the design intent
+  is for agents to query rules BEFORE generating JSX, not just after
+  lint reports an issue. Reactive lookup also works (`explain
+  <RULE_ID>` after seeing a `fail`), but the bigger UX win is writing
+  compliant code from the start.
+
+[0.3.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.0
+
 ## [0.2.1] — 2026-05-08
 
 Patch — sharper definition of `lint` `fail` vs `caveat`. Triggered by
@@ -195,6 +273,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.0...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1
