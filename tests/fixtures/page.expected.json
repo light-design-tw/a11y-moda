@@ -1,0 +1,30 @@
+[
+  {
+    "file": "page.html",
+    "rule_id": "GN1240100E",
+    "status": "fail",
+    "line": 4,
+    "col": 1
+  },
+  {
+    "file": "page.html",
+    "rule_id": "GN1240102E",
+    "status": "fail",
+    "line": 4,
+    "col": 1
+  },
+  {
+    "file": "page.html",
+    "rule_id": "HM1110100C",
+    "status": "fail",
+    "line": 6,
+    "col": 3
+  },
+  {
+    "file": "page.html",
+    "rule_id": "HM1240401C",
+    "status": "fail",
+    "line": 7,
+    "col": 3
+  }
+]

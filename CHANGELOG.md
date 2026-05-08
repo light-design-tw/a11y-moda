@@ -7,6 +7,70 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-05-08
+
+Engineering scaffolding patch — adds the `tests/` directory the
+project shipped without through 0.1.0–0.3.2. No runtime / CLI / rule
+behaviour changes. The package on PyPI is bit-for-bit equivalent
+except for `tests/` (which is repo-only, not packaged).
+
+Until this version every refactor relied on dogfood (manually scanning
+real sites) to catch regressions. Now there is a CI gate.
+
+### Added
+
+- **`tests/test_smoke.py`** — 15 invariants covering CLI surface,
+  bundled package-data, JSON contract, and prior-version regressions:
+  - `--version` / top-level `--help` lists all subcommands
+    (`lint` / `scan` / `site` / `rules` / `init` / `explain`)
+  - `init claude-code|cursor|aider|copilot|agent` writes the right
+    files to the right paths — including the `.aider.conf.yml` /
+    `.cursorrules` dotfiles that v0.3.1 nearly missed bundling
+  - `lint` emits parseable JSON with the documented `files` /
+    `summary` shape; `HM1110100C` fires on `<img>` without `alt`
+  - `lint` `runtime_authoritative` downgrade still active —
+    `<div onClick>` triggers `GN1210100E` as `caveat` not `fail`
+    (regression guard for v0.2.1)
+  - `rules show` / `rules search` / `explain` return JSON with the
+    documented 9-field schema; `explain` is byte-identical to
+    `rules show`
+- **`tests/test_lint_golden.py`** — snapshot-diff lint output against
+  two frozen fixtures (`violations.tsx` + `page.html`). Catches
+  refactor regressions in `rules/_lib/` helpers, tree-sitter grammar
+  bumps, and rule auto-discovery import-depth typos. Snapshots store
+  `(rule_id, status, line, col)` tuples — message text and absolute
+  paths excluded as locale/machine-dependent.
+- **`tests/regen_snapshots.py`** — single command to regenerate
+  snapshots after intentional rule-logic changes. The diff between
+  before/after `expected.json` becomes the changelog entry for the
+  rule change.
+- **`tests/README.md`** — when-snapshot-fails decision tree, fixture
+  design rules, how to add a new fixture.
+- **`[project.optional-dependencies] dev = ["pytest>=8,<10"]`** — test
+  runner only; runtime install path unchanged.
+- **`[tool.pytest.ini_options]`** — `testpaths = ["tests"]`,
+  `addopts = "-ra --strict-markers"`.
+
+### Changed
+
+- **`.github/workflows/release.yml`** — replaced the inline 8-line
+  smoke shell block with `pip install dist/*.whl && pip install pytest
+  && pytest tests/`. The wheel — not an editable install — is what
+  gets tested, so packaging regressions (missing package-data, broken
+  entry points) fail CI before PyPI publish.
+
+### Notes
+
+- **Why no per-rule unit tests** — 143 brittle fixtures, 0 external
+  contributors, would couple test files to MODA spec rewording. Tier
+  2 golden-snapshot covers the same ground at 1/70th the maintenance
+  cost. Documented in `tests/README.md`.
+- **Why no scan / Playwright tests** — Chromium output drifts across
+  versions, fixture maintenance hostile to CI runners. `scan` is
+  already exercised continuously by dogfood (light-design.com.tw).
+- **Why no LLM-rule (E rules) snapshot** — non-deterministic, would
+  measure the mock instead of the rule.
+
 ## [0.3.2] — 2026-05-08
 
 Description-only patch — no code change. Rewrites the bundled Claude
@@ -401,7 +465,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

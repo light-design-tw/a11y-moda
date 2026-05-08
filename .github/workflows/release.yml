@@ -36,23 +36,18 @@ jobs:
           python -m build
           twine check dist/*
 
-      - name: Smoke test built wheel
+      - name: Test built wheel (pytest)
         run: |
+          # Install the freshly built wheel — NOT editable. Tests must
+          # exercise the same artefact that ships to PyPI: bundled
+          # package-data, console_script entry point, the lot.
           python -m pip install dist/*.whl
-          a11y-moda --version
-          a11y-moda scan --help > /dev/null
-          a11y-moda site --help > /dev/null
-          a11y-moda lint --help > /dev/null
-          # Force rule discovery + tree-sitter grammar load by linting a
-          # tiny in-repo fixture. Catches missing-dep, broken grammar,
-          # or auto-discovery import failures before publish.
-          mkdir -p smoke
-          cat > smoke/img.tsx <<'EOF'
-          export const X = () => <img src="x.png" />;
-          EOF
-          a11y-moda lint smoke/ --format json -o smoke.json
-          # CLI resolves bare `-o name` to ./reports/name (cwd-relative).
-          python -c "import json; r=json.load(open('reports/smoke.json', encoding='utf-8')); assert any(i['rule_id']=='HM1110100C' for f in r['files'] for i in f['issues']), 'lint smoke failed: HM1110100C not fired'"
+          python -m pip install pytest
+          # Tier 1 (test_smoke.py) verifies CLI surface + bundled
+          # _examples/ + prior-version regressions (dotfile bundling,
+          # runtime_authoritative downgrade). Tier 2 (test_lint_golden.py)
+          # snapshot-diffs lint output against frozen fixtures.
+          pytest tests/ -v
 
       - uses: actions/upload-artifact@v4
         with:

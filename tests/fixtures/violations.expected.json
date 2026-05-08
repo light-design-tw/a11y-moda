@@ -1,0 +1,16 @@
+[
+  {
+    "file": "violations.tsx",
+    "rule_id": "GN1210100E",
+    "status": "caveat",
+    "line": 6,
+    "col": 3
+  },
+  {
+    "file": "violations.tsx",
+    "rule_id": "HM1110100C",
+    "status": "fail",
+    "line": 10,
+    "col": 3
+  }
+]

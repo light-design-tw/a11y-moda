@@ -1,6 +1,6 @@
 [project]
 name = "a11y-moda"
-version = "0.3.2"
+version = "0.3.3"
 description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
 license = "MIT"
@@ -49,6 +49,12 @@ scan = [
 all = [
     "playwright>=1.59,<2.0",
 ]
+# Test runner + helpers. Not needed at runtime; only for `pytest tests/`
+# during development or in release.yml CI. Install with:
+#   pip install 'a11y-moda[dev]'
+dev = [
+    "pytest>=8,<10",
+]
 
 [project.urls]
 Homepage = "https://github.com/light-design-tw/a11y-moda"
@@ -66,6 +72,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
 
 [tool.setuptools.package-data]
 # Bundle IDE / agent integration templates so `a11y-moda init <ide>`
