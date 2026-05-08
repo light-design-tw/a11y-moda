@@ -1,6 +1,6 @@
 [project]
 name = "a11y-moda"
-version = "0.3.0"
+version = "0.3.1"
 description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
 license = "MIT"
@@ -66,3 +66,16 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Bundle IDE / agent integration templates so `a11y-moda init <ide>`
+# can copy them into the user's repo / config dir without requiring
+# them to clone the GitHub repo. Explicit paths needed because dotfiles
+# (.cursorrules) and dotdirs (.github/) are skipped by glob defaults.
+a11y_moda = [
+    "_examples/**/*.md",
+    "_examples/**/*.yml",
+    "_examples/aider/.aider.conf.yml",
+    "_examples/cursor/.cursorrules",
+    "_examples/copilot/.github/copilot-instructions.md",
+]

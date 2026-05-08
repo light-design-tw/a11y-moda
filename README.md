@@ -104,10 +104,23 @@ export A11Y_LLM_MODEL=gpt-4o-mini
 
 a11y-moda 設計上對 AI agent 友善 — 穩定 JSON schema、`status` enum 三態 (`fail` / `caveat` / `pass`)、第三方資源 `[third-party: <origin>]` 前綴等都有規範。讓 AI 邊寫 code 邊掃 a11y、邊修邊重驗。
 
+**一鍵安裝整合 (since v0.3.1)**:
+
+```bash
+a11y-moda init claude-code        # → ~/.claude/skills/a11y-moda/
+a11y-moda init cursor             # → ./.cursorrules
+a11y-moda init copilot            # → ./.github/copilot-instructions.md
+a11y-moda init aider              # → ./.aider.conf.yml
+a11y-moda init agent              # → stdout (paste 進你的 agent system prompt)
+a11y-moda init --list             # 列所有可裝的 IDE / agent
+```
+
+完整文件:
+
 | 文件 | 用途 |
 |---|---|
-| [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) | 通用 AI agent 整合指南 (任何能呼 CLI 的 LLM)。含 JSON schema、flag 決策樹、Cursor `.cursorrules` / GitHub Copilot `.github/copilot-instructions.md` / Aider 內嵌範本 |
-| [`examples/claude-code-skill/`](./examples/claude-code-skill/) | Claude Code skill 範本。複製進 `~/.claude/skills/a11y-moda/` 後對 Claude 說「掃 a11y」/「MODA 標章驗」即觸發 |
+| [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) | 通用 AI agent 整合指南 (任何能呼 CLI 的 LLM)。含 JSON schema、flag 決策樹、各 IDE 範本 |
+| [`src/a11y_moda/_examples/`](./src/a11y_moda/_examples/) | 5 個 IDE / agent 整合範本 (claude-code-skill / cursor / copilot / aider / generic-agent)，由 `a11y-moda init` 自動分發 |
 
 ## 指令參考
 

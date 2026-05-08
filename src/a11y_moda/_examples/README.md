@@ -1,14 +1,26 @@
 # Examples
 
-Optional, platform-specific integration examples for `a11y-moda`. Pick the one matching your AI agent / IDE.
+Bundled integration templates for `a11y-moda`. Auto-distributed via the
+`a11y-moda init <ide>` subcommand (since v0.3.1).
 
-| Directory | For | Path in your repo |
+```bash
+a11y-moda init --list             # list all integrations
+a11y-moda init claude-code        # → ~/.claude/skills/a11y-moda/
+a11y-moda init cursor             # → ./.cursorrules
+a11y-moda init copilot            # → ./.github/copilot-instructions.md
+a11y-moda init aider              # → ./.aider.conf.yml
+a11y-moda init agent              # → stdout (paste into agent system prompt)
+```
+
+Manual browse / copy if needed:
+
+| Directory | For | Default install path |
 |---|---|---|
 | [`claude-code-skill/`](./claude-code-skill/) | [Claude Code](https://claude.com/claude-code) | `~/.claude/skills/a11y-moda/` |
 | [`cursor/`](./cursor/) | [Cursor](https://cursor.sh/) | `<repo-root>/.cursorrules` |
 | [`copilot/`](./copilot/) | [GitHub Copilot Chat](https://github.com/features/copilot) | `<repo-root>/.github/copilot-instructions.md` |
 | [`aider/`](./aider/) | [Aider](https://aider.chat/) | `<repo-root>/.aider.conf.yml` |
-| [`generic-agent/`](./generic-agent/) | Any LLM-based coding agent (Cline, Continue, RooCode, custom) | Pin into your agent's system prompt |
+| [`generic-agent/`](./generic-agent/) | Any LLM-based coding agent (Cline, Continue, RooCode, custom) | stdout (paste into agent system prompt) |
 
 All examples share one architectural pattern (since v0.3.0):
 

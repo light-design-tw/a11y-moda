@@ -544,32 +544,46 @@ Process env vars (shell `export`, Docker `-e`, CI runner) always win over `.env`
 
 ## 11. Platform quickstarts
 
-Each example directory in `examples/` ships a ready-to-copy config that
-matches that platform's auto-loaded location. All examples teach the
-same proactive pattern: query `a11y-moda rules` BEFORE writing
-a11y-sensitive elements; run `lint` / `scan` / `site` AFTER.
+Since v0.3.1, examples are bundled in the package and installed via
+`a11y-moda init <ide>`. No need to clone the repo or copy from GitHub.
+All examples teach the same proactive pattern: query `a11y-moda rules`
+BEFORE writing a11y-sensitive elements; run `lint` / `scan` / `site`
+AFTER.
 
-| Platform | Example | Path in your repo |
+```bash
+a11y-moda init --list             # list all integrations + their target paths
+a11y-moda init claude-code        # install Claude Code skill
+a11y-moda init cursor             # install Cursor .cursorrules
+a11y-moda init copilot            # install Copilot instructions
+a11y-moda init aider              # install Aider config
+a11y-moda init agent              # print AGENT.md to stdout (paste into agent prompt)
+
+a11y-moda init <ide> --print      # preview content (don't write)
+a11y-moda init <ide> --dest PATH  # custom install path
+a11y-moda init <ide> --force      # overwrite existing
+```
+
+| Platform | Bundled in | Default install path |
 |---|---|---|
-| Claude Code | [`examples/claude-code-skill/`](../examples/claude-code-skill/) | `~/.claude/skills/a11y-moda/` |
-| Cursor | [`examples/cursor/`](../examples/cursor/) | `<repo-root>/.cursorrules` |
-| GitHub Copilot Chat | [`examples/copilot/`](../examples/copilot/) | `<repo-root>/.github/copilot-instructions.md` |
-| Aider | [`examples/aider/`](../examples/aider/) | `<repo-root>/.aider.conf.yml` |
-| Generic LLM agent (Cline, Continue, RooCode, custom) | [`examples/generic-agent/`](../examples/generic-agent/) | Pin into agent system prompt |
+| Claude Code | [`src/a11y_moda/_examples/claude-code-skill/`](../src/a11y_moda/_examples/claude-code-skill/) | `~/.claude/skills/a11y-moda/` |
+| Cursor | [`src/a11y_moda/_examples/cursor/`](../src/a11y_moda/_examples/cursor/) | `<repo-root>/.cursorrules` |
+| GitHub Copilot Chat | [`src/a11y_moda/_examples/copilot/`](../src/a11y_moda/_examples/copilot/) | `<repo-root>/.github/copilot-instructions.md` |
+| Aider | [`src/a11y_moda/_examples/aider/`](../src/a11y_moda/_examples/aider/) | `<repo-root>/.aider.conf.yml` |
+| Generic LLM agent (Cline, Continue, RooCode, custom) | [`src/a11y_moda/_examples/generic-agent/`](../src/a11y_moda/_examples/generic-agent/) | stdout (paste into agent system prompt) |
 
 ### 11.1 Claude Code (Skill)
 
 ```bash
-cp -r examples/claude-code-skill ~/.claude/skills/a11y-moda
+a11y-moda init claude-code        # one-line install
 ```
 
 Then in Claude Code, invoke with `/a11y-moda` or natural-language triggers ("check a11y", "MODA 標章驗", or about specific rule_id). The skill detects intent (knowledge query / lint / scan / site), picks flags per §4, runs, and applies §6 triage.
 
-See [`examples/claude-code-skill/README.md`](../examples/claude-code-skill/README.md).
+See [`src/a11y_moda/_examples/claude-code-skill/README.md`](../src/a11y_moda/_examples/claude-code-skill/README.md).
 
 ### 11.2 Cursor
 
-**Recommended (since v0.3.0)**: copy [`examples/cursor/.cursorrules`](../examples/cursor/.cursorrules) to your repo root. Includes pre-write rule lookup + lint/scan invocation patterns + triage rules.
+**Recommended (since v0.3.1)**: `a11y-moda init cursor` — one-line install to `./.cursorrules`. Or browse the source at [`src/a11y_moda/_examples/cursor/`](../src/a11y_moda/_examples/cursor/).
 
 Inline minimal version (older / custom) below:
 
@@ -607,7 +621,7 @@ or 無障礙檢查, use the `a11y-moda` CLI:
 
 ### 11.3 Aider
 
-**Recommended (since v0.3.0)**: copy [`examples/aider/.aider.conf.yml`](../examples/aider/.aider.conf.yml) to your repo root. Includes `lint-cmd:` hook so Aider auto-lints after each edit.
+**Recommended (since v0.3.1)**: `a11y-moda init aider` — one-line install to `./.aider.conf.yml`. Includes `lint-cmd:` hook so Aider auto-lints after each edit. Browse source: [`src/a11y_moda/_examples/aider/`](../src/a11y_moda/_examples/aider/).
 
 Inline minimal version (older / custom):
 
@@ -629,7 +643,7 @@ a11y-moda scan "$url" --level AA --render --allow-private-hosts --format json
 
 ### 11.4 GitHub Copilot
 
-**Recommended (since v0.3.0)**: copy [`examples/copilot/.github/copilot-instructions.md`](../examples/copilot/.github/copilot-instructions.md) to your repo's matching path.
+**Recommended (since v0.3.1)**: `a11y-moda init copilot` — one-line install to `./.github/copilot-instructions.md`. Browse source: [`src/a11y_moda/_examples/copilot/`](../src/a11y_moda/_examples/copilot/).
 
 Inline minimal version (older / custom) — add to `.github/copilot-instructions.md` at your repo root. Copilot Chat auto-loads this file as context when you chat in this repo:
 
@@ -697,7 +711,7 @@ For full reference: https://github.com/light-design-tw/a11y-moda/blob/main/docs/
 
 ### 11.5 Generic LLM agent (Cline, Continue, RooCode, custom)
 
-**Recommended (since v0.3.0)**: pin [`examples/generic-agent/AGENT.md`](../examples/generic-agent/AGENT.md) into the agent's system prompt / instructions. Covers pre-write rule lookup, lint/scan/site invocation, triage, and anti-patterns in one platform-agnostic doc.
+**Recommended (since v0.3.1)**: `a11y-moda init agent` prints the AGENT.md content to stdout — pipe / paste into your agent's system prompt / instructions. Covers pre-write rule lookup, lint/scan/site invocation, triage, and anti-patterns in one platform-agnostic doc. Browse source: [`src/a11y_moda/_examples/generic-agent/`](../src/a11y_moda/_examples/generic-agent/).
 
 ### 11.6 Plain shell
 

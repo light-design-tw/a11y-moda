@@ -62,8 +62,19 @@ export A11Y_LLM_MODEL=gpt-4o-mini
 
 Stable JSON schema, three-tier `status` enum (`fail` / `caveat` / `pass`), `[third-party: <origin>]` prefix on caveats from external resources — all designed for AI workflows (write → scan → fix → re-verify).
 
-- [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) — platform-agnostic guide. Inline snippets for Cursor `.cursorrules`, GitHub Copilot `.github/copilot-instructions.md`, and Aider.
-- [`examples/claude-code-skill/`](./examples/claude-code-skill/) — bundled Claude Code skill. Copy into `~/.claude/skills/a11y-moda/` then say "check a11y" / "WCAG audit" / "無障礙檢查".
+**One-line install** (since v0.3.1):
+
+```bash
+a11y-moda init claude-code        # → ~/.claude/skills/a11y-moda/
+a11y-moda init cursor             # → ./.cursorrules
+a11y-moda init copilot            # → ./.github/copilot-instructions.md
+a11y-moda init aider              # → ./.aider.conf.yml
+a11y-moda init agent              # → stdout (paste into your agent system prompt)
+a11y-moda init --list             # list all available IDE / agent integrations
+```
+
+- [`docs/AI_INTEGRATION.md`](./docs/AI_INTEGRATION.md) — platform-agnostic guide.
+- [`src/a11y_moda/_examples/`](./src/a11y_moda/_examples/) — 5 bundled integration templates (claude-code-skill / cursor / copilot / aider / generic-agent). Auto-distributed by `a11y-moda init`.
 
 ## Coverage highlights
 

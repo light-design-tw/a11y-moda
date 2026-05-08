@@ -7,6 +7,70 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-08
+
+UX completion patch for v0.3.0's knowledge-service positioning. Removes
+the "go clone GitHub and copy this file" friction for IDE / agent
+integration. Also revamps top-level `--help` to surface all current
+capabilities (audit / knowledge / integration) at a glance.
+
+### Added
+
+- **`a11y-moda init <ide>` subcommand** — one-line install of bundled
+  IDE / agent integration templates. No more "open GitHub → find
+  examples/ → copy → paste".
+  - `init claude-code` → `~/.claude/skills/a11y-moda/` (full skill dir
+    with SKILL.md + REFERENCE.md)
+  - `init cursor` → `./.cursorrules`
+  - `init copilot` → `./.github/copilot-instructions.md`
+  - `init aider` → `./.aider.conf.yml`
+  - `init agent` → stdout (or `--dest` for file write); platform-agnostic
+    AGENT.md for any LLM agent (Cline, Continue, RooCode, custom)
+  - `init --list` — list all IDEs + their default install paths
+  - `init <ide> --print` — preview content (don't write); useful for CI
+    / piping to other commands / pasting into agent prompts
+  - `init <ide> --dest <path>` — override default install path
+  - `init <ide> --force` — overwrite existing destination files
+- **Bundled examples in package** — `_examples/` directory now ships
+  with the wheel via `[tool.setuptools.package-data]`. End users no
+  longer need to clone the repo.
+- **Comprehensive `--help`** — top-level help text now lists all
+  capabilities organised into AUDIT / KNOWLEDGE / INTEGRATION /
+  INSTALL sections. Single screen overview for new users.
+
+### Changed
+
+- **`examples/` → `src/a11y_moda/_examples/`** — moved into the package
+  so it ships with `pip install a11y-moda`. GitHub browse paths updated
+  in README, README.en, docs/AI_INTEGRATION.md. Old `examples/` URLs in
+  CHANGELOG entries 0.3.0 left as historical record.
+- **`docs/AI_INTEGRATION.md` §11** — recommends `a11y-moda init <ide>`
+  as the primary install path; manual copy from GitHub demoted to
+  fallback.
+- **`SKILL.md` README** — install instructions simplified from
+  "git clone + curl" to "`a11y-moda init claude-code`".
+
+### Notes
+
+- **Why no interactive prompt** — `a11y-moda init` (no IDE arg) prints
+  ERROR + clear options list rather than a `click.prompt` loop. AI
+  agents (Claude Code, Cursor, Copilot, Aider) shell out without TTY
+  stdin and would hang on interactive prompts. Single-line
+  `init <ide>` works the same for AI and human users.
+- **Why `--force` required for overwrite** — `.cursorrules`,
+  `SKILL.md`, etc. are commonly hand-edited. Silent overwrite would
+  destroy user work. Default behavior: refuse with helpful ERROR;
+  `--force` opt-in to replace.
+- **Why `init agent` has no default file path** — the AGENT.md content
+  is meant for the agent's *system prompt* setting (location varies
+  by agent: Cline = workspace settings, Continue = config.json,
+  custom = code). Default = stdout for piping; `--dest` for file.
+- **AI install flow now possible**: user says "set up a11y-moda for
+  Cursor", agent runs `pip install a11y-moda && a11y-moda init cursor`,
+  done. No human navigation through GitHub UI.
+
+[0.3.1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.1
+
 ## [0.3.0] — 2026-05-08
 
 **BREAKING**: Playwright is no longer installed by default. The default
@@ -273,6 +337,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.1...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

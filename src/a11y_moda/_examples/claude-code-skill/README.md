@@ -24,42 +24,31 @@ playwright install chromium    # one-time, required for --render
 
 ### 2. Install this skill
 
-The skill files are **not** included in `pip install a11y-moda` (the PyPI package only ships the CLI). You need to fetch them separately.
+#### Recommended (since v0.3.1): one-line install
 
-#### Option A: clone the repo (recommended if you also want to read the source)
-
-```bash
-git clone https://github.com/light-design-tw/a11y-moda
-cd a11y-moda
-cp -r examples/claude-code-skill ~/.claude/skills/a11y-moda
-```
-
-Windows PowerShell:
-
-```powershell
-git clone https://github.com/light-design-tw/a11y-moda
-Copy-Item -Recurse a11y-moda\examples\claude-code-skill `
-                   "$env:USERPROFILE\.claude\skills\a11y-moda"
-```
-
-#### Option B: curl just the skill files (lightweight)
+The skill files are bundled in the `a11y-moda` PyPI package. Use the
+built-in `init` subcommand:
 
 ```bash
-mkdir -p ~/.claude/skills/a11y-moda
-base="https://raw.githubusercontent.com/light-design-tw/a11y-moda/main/examples/claude-code-skill"
-curl -sSLO --output-dir ~/.claude/skills/a11y-moda "$base/SKILL.md"
-curl -sSLO --output-dir ~/.claude/skills/a11y-moda "$base/REFERENCE.md"
+a11y-moda init claude-code
 ```
 
-Windows PowerShell:
+This copies `SKILL.md` + `REFERENCE.md` into `~/.claude/skills/a11y-moda/`.
 
-```powershell
-$dst = "$env:USERPROFILE\.claude\skills\a11y-moda"
-New-Item -ItemType Directory -Force $dst | Out-Null
-$base = "https://raw.githubusercontent.com/light-design-tw/a11y-moda/main/examples/claude-code-skill"
-Invoke-WebRequest "$base/SKILL.md"     -OutFile "$dst\SKILL.md"
-Invoke-WebRequest "$base/REFERENCE.md" -OutFile "$dst\REFERENCE.md"
+Override destination if needed:
+
+```bash
+a11y-moda init claude-code --dest /custom/path
+a11y-moda init claude-code --force      # overwrite existing
+a11y-moda init claude-code --print      # preview content (don't write)
 ```
+
+#### Manual install (if you can't use the CLI)
+
+Browse the bundled skill source on GitHub at
+[`src/a11y_moda/_examples/claude-code-skill/`](https://github.com/light-design-tw/a11y-moda/tree/main/src/a11y_moda/_examples/claude-code-skill)
+and copy `SKILL.md` + `REFERENCE.md` into `~/.claude/skills/a11y-moda/`
+yourself.
 
 `README.md` (this file) is optional — it's for human reference only and the skill works without it.
 

@@ -154,7 +154,36 @@ def _serialize_scan(scan: ScanReport) -> dict:
                    "process env vars are never overridden.")
 @click.pass_context
 def main(ctx: click.Context, env_file: str | None) -> None:
-    """MODA accessibility scanner."""
+    """Taiwan MODA accessibility CLI — WCAG A/AA/AAA · zh-TW · 129 rules.
+
+    \b
+    AUDIT (find a11y violations in your code or pages)
+      lint <paths>          source-level (tree-sitter; no browser, no LLM)
+      scan <URL>            one page (rendered DOM via Playwright)
+      site <URL>            whole site (sitemap → BFS, rendered DOM)
+
+    \b
+    KNOWLEDGE (query MODA rule metadata; agents call these BEFORE writing
+    accessibility-sensitive elements like <button>, <form>, <img>, etc.)
+      rules list            list rules by level / topic / source / scope
+      rules show <RULE_ID>  show one rule (rule_id, WCAG SC, level, desc, ...)
+      rules search <query>  search by keyword / WCAG SC / topic
+      explain  <RULE_ID>    short alias for `rules show`
+
+    \b
+    INTEGRATION (one-line install for AI agents / IDEs)
+      init <ide>            install integration template (claude-code,
+                            cursor, copilot, aider, agent)
+      init --list           show all available IDE integrations
+
+    \b
+    INSTALL VARIANTS (since v0.3.0)
+      pip install a11y-moda             lint + rules (lightweight ~30MB)
+      pip install 'a11y-moda[scan]'     add browser-based scan / site
+      playwright install chromium       required for --render
+
+    Docs: https://github.com/light-design-tw/a11y-moda
+    """
     _load_env_files(env_file)
 
 
@@ -713,6 +742,244 @@ def rules_search(query: str, fmt: str, output: str | None) -> None:
 def explain(ctx: click.Context, rule_id: str, fmt: str, output: str | None) -> None:
     """Alias for `rules show <RULE_ID>` — short form."""
     ctx.invoke(rules_show, rule_id=rule_id, fmt=fmt, output=output)
+
+
+# ---------------------------------------------------------------------------
+# `init` subcommand — install bundled IDE / agent integration template.
+# ---------------------------------------------------------------------------
+#
+# Eliminates the GitHub-clone-and-copy step. Examples are bundled in the
+# package (since v0.3.1) via package-data. `init` reads them via
+# importlib.resources and writes / prints them to the user's target.
+#
+# Design choices:
+#   - No interactive prompt mode. AI agents (Claude Code, Cursor, Copilot
+#     Bash) lack stdin and would hang. `--list` + clear ERROR-with-options
+#     gives the same UX without the hang risk.
+#   - --force required to overwrite existing files. Avoids destroying a
+#     user's hand-crafted .cursorrules / SKILL.md.
+#   - --print sends content to stdout instead of writing — useful for CI
+#     preview, piping to other commands, or pasting into agent prompts.
+#   - --dest overrides the default install path per IDE.
+#   - `agent` IDE has no default file path — always prints to stdout
+#     unless --dest given. The expected workflow is to paste it into the
+#     agent's system prompt setting (which is GUI / config-specific).
+
+# IDE name → (bundled subpath, default install dest, kind)
+# kind: "dir" copies a whole subtree; "file" copies one file; "stdout"
+# always prints to stdout (no default file destination).
+_INIT_TARGETS: dict[str, tuple[str, str | None, str]] = {
+    "claude-code": ("claude-code-skill",
+                    "~/.claude/skills/a11y-moda",
+                    "dir"),
+    "cursor":      ("cursor/.cursorrules",
+                    "./.cursorrules",
+                    "file"),
+    "copilot":     ("copilot/.github/copilot-instructions.md",
+                    "./.github/copilot-instructions.md",
+                    "file"),
+    "aider":       ("aider/.aider.conf.yml",
+                    "./.aider.conf.yml",
+                    "file"),
+    "agent":       ("generic-agent/AGENT.md",
+                    None,
+                    "stdout"),
+}
+
+# Per-IDE next-step hints printed after successful install.
+_INIT_NEXT_STEPS: dict[str, str] = {
+    "claude-code": (
+        "  - Reload Claude Code (the skill registers on next start)\n"
+        "  - Test: type /a11y-moda or say \"check a11y\""
+    ),
+    "cursor": (
+        "  - Reload Cursor (the rules apply to next chat / Composer / inline-edit)\n"
+        "  - Test: ask Cursor \"what MODA rules apply to <button>?\""
+    ),
+    "copilot": (
+        "  - Open GitHub Copilot Chat in this repo\n"
+        "  - Instructions auto-apply to next message"
+    ),
+    "aider": (
+        "  - Run aider in this repo — config auto-loads\n"
+        "  - The lint-cmd hook will run a11y-moda lint after each edit"
+    ),
+    "agent": (
+        "  - Paste the printed content into your agent's system prompt /\n"
+        "    instructions setting (location varies by agent)"
+    ),
+}
+
+
+def _list_init_targets_text() -> str:
+    """Compact textual list of install targets for --list / ERROR output."""
+    lines = []
+    width = max(len(k) for k in _INIT_TARGETS)
+    for ide, (_, dest, kind) in _INIT_TARGETS.items():
+        if kind == "stdout":
+            shown = "(prints to stdout — paste into agent system prompt)"
+        else:
+            shown = dest
+        lines.append(f"  {ide:<{width}}   {shown}")
+    return "\n".join(lines)
+
+
+def _resolve_init_dest(ide: str, dest_override: str | None) -> Path:
+    """Expand ~, make Path. dest_override wins over per-IDE default."""
+    _, default_dest, kind = _INIT_TARGETS[ide]
+    if dest_override:
+        return Path(os.path.expanduser(dest_override))
+    if default_dest is None:
+        # `agent` IDE — no default; caller should have used --print or --dest.
+        raise click.UsageError(
+            f"`init {ide}` has no default file destination. "
+            f"Use --print to send to stdout, or --dest <path> to choose a file."
+        )
+    return Path(os.path.expanduser(default_dest))
+
+
+def _read_bundled(subpath: str) -> bytes:
+    """Read a bundled example by subpath under a11y_moda/_examples/."""
+    import importlib.resources as ir
+    parts = subpath.split("/")
+    res = ir.files("a11y_moda._examples")
+    for p in parts:
+        res = res / p
+    return res.read_bytes()
+
+
+def _iter_bundled_dir(subpath: str):
+    """Yield (relative_filename, bytes) for every file under a bundled dir."""
+    import importlib.resources as ir
+    root = ir.files("a11y_moda._examples")
+    for p in subpath.split("/"):
+        root = root / p
+    for entry in root.iterdir():
+        if entry.is_file():
+            yield entry.name, entry.read_bytes()
+        elif entry.is_dir():
+            # Recurse one level (current bundle only has 1-deep subdirs)
+            for sub in entry.iterdir():
+                if sub.is_file():
+                    yield f"{entry.name}/{sub.name}", sub.read_bytes()
+
+
+@main.command("init")
+@click.argument("ide", required=False)
+@click.option("--list", "list_only", is_flag=True,
+              help="List all available IDE / agent integrations and exit.")
+@click.option("--dest", type=click.Path(), default=None,
+              help="Override the default install path.")
+@click.option("--print", "print_only", is_flag=True,
+              help="Print content to stdout instead of writing to disk.")
+@click.option("--force", is_flag=True,
+              help="Overwrite existing destination files.")
+def init(ide: str | None, list_only: bool, dest: str | None,
+         print_only: bool, force: bool) -> None:
+    """Install a11y-moda integration template for an IDE / agent.
+
+    Available IDEs: claude-code, cursor, copilot, aider, agent
+    Run `a11y-moda init --list` for full path details.
+
+    Examples:
+      a11y-moda init claude-code
+      a11y-moda init cursor
+      a11y-moda init aider --force
+      a11y-moda init agent --print > my-prompt.md
+      a11y-moda init copilot --dest /custom/path/instructions.md
+    """
+    if list_only:
+        click.echo("Available a11y-moda integrations:\n")
+        click.echo(_list_init_targets_text())
+        click.echo("\nUse: a11y-moda init <ide>")
+        return
+
+    if not ide:
+        click.echo("ERROR: missing IDE name.\n", err=True)
+        click.echo("Available:", err=True)
+        click.echo(_list_init_targets_text(), err=True)
+        click.echo("\nRun: a11y-moda init <ide>           e.g. a11y-moda init cursor",
+                   err=True)
+        click.echo("List: a11y-moda init --list", err=True)
+        sys.exit(2)
+
+    if ide not in _INIT_TARGETS:
+        click.echo(f"ERROR: unknown IDE {ide!r}.\n", err=True)
+        click.echo("Available:", err=True)
+        click.echo(_list_init_targets_text(), err=True)
+        sys.exit(2)
+
+    bundled_subpath, _, kind = _INIT_TARGETS[ide]
+
+    # --print: always go stdout regardless of kind/dest
+    if print_only:
+        if kind == "dir":
+            # Print a separator-marked concatenation of all files
+            for fname, content in _iter_bundled_dir(bundled_subpath):
+                click.echo(f"# ===== {fname} =====")
+                click.echo(content.decode("utf-8", errors="replace"))
+                click.echo()
+            return
+        content = _read_bundled(bundled_subpath)
+        click.echo(content.decode("utf-8", errors="replace"))
+        return
+
+    # `agent` IDE without --print and without --dest → tell user
+    if kind == "stdout" and dest is None:
+        click.echo(
+            "ERROR: `init agent` has no default file destination.\n"
+            "Choose one:\n"
+            "  a11y-moda init agent --print              # print to stdout\n"
+            "  a11y-moda init agent --print > AGENT.md   # save to file\n"
+            "  a11y-moda init agent --dest AGENT.md      # write to specific path",
+            err=True,
+        )
+        sys.exit(2)
+
+    target = _resolve_init_dest(ide, dest)
+
+    # `agent` (kind=stdout) with --dest given → treat as file write.
+    if kind == "stdout":
+        kind = "file"
+
+    if kind == "file":
+        if target.exists() and not force:
+            click.echo(
+                f"ERROR: {target} already exists.\n"
+                f"Use --force to overwrite, or --print to preview.",
+                err=True,
+            )
+            sys.exit(2)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(_read_bundled(bundled_subpath))
+        line_count = target.read_text(encoding="utf-8").count("\n")
+        click.echo(f"Installing a11y-moda {ide} integration...\n")
+        click.echo(f"  source: bundled {bundled_subpath}")
+        click.echo(f"  dest:   {target}")
+        click.echo(f"\n[OK] Wrote {line_count} lines to {target}")
+        click.echo(f"\nNext:\n{_INIT_NEXT_STEPS[ide]}")
+        return
+
+    if kind == "dir":
+        target.mkdir(parents=True, exist_ok=True)
+        wrote_count = 0
+        skipped = []
+        for rel_name, content in _iter_bundled_dir(bundled_subpath):
+            dest_file = target / rel_name
+            if dest_file.exists() and not force:
+                skipped.append(rel_name)
+                continue
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            dest_file.write_bytes(content)
+            wrote_count += 1
+        click.echo(f"Installing a11y-moda {ide} skill...\n")
+        click.echo(f"  source: bundled {bundled_subpath}/")
+        click.echo(f"  dest:   {target}/")
+        click.echo(f"\n[OK] Copied {wrote_count} file(s)")
+        if skipped:
+            click.echo(f"     Skipped (use --force to overwrite): {', '.join(skipped)}")
+        click.echo(f"\nNext:\n{_INIT_NEXT_STEPS[ide]}")
+        return
 
 
 def _resolve_fmt(fmt: str, output: str | None) -> str:
