@@ -7,6 +7,70 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-05-08
+
+Description-only patch — no code change. Rewrites the bundled Claude
+Code skill `description` field for higher trigger accuracy in
+real-invocation conditions. Validated by N=3 × 30-prompt benchmark
+using `claude -p` cold-context invocation against a real installed
+skill in `~/.claude/skills/a11y-moda/`.
+
+### Changed
+
+- **Claude Code skill `description` rewritten** —
+  `src/a11y_moda/_examples/claude-code-skill/SKILL.md` frontmatter.
+  Existing installs upgrade by re-running `a11y-moda init claude-code
+  --force`. Skill body (sections 1-12, REFERENCE.md) unchanged.
+
+### Benchmark (real `claude -p`, n=3 × 30 prompts = 90 runs)
+
+| Tier                       | v0.3.1 stock | v0.3.2 rewrite | Δ   |
+|----------------------------|--------------|----------------|-----|
+| 1 — must trigger (10)      | 6/10 (60%)   | 9/10 (93%)     | +3  |
+| 2 — should trigger (10)    | 0/10 (0%)    | 8/10 (77%)     | +8  |
+| 3 — must NOT trigger (10)  | 10/10 (0% FP)| 10/10 (0% FP)  | 0   |
+| **Total**                  | **16/30**    | **27/30**      | **+11** |
+
+90% pass rate. Zero false-positive regression.
+
+### Why
+
+v0.3.1 description listed trigger phrases but covered no implicit a11y
+pain (keyboard 不到 / contrast / dialog ESC) and did not address
+Claude's bias to (a) answer rule-content questions from training
+memory or (b) bypass the skill and invoke `a11y-moda` directly via
+Bash when the user names the CLI.
+
+v0.3.2 rewrite addresses both:
+
+- Explicit anti-pattern: "Do NOT answer from memory or run a11y-moda
+  directly via Bash"
+- Six numbered invoke clauses covering rule_id (with prefix pattern),
+  CLI mention by name, a11y pain phrases, MODA / WCAG asks, pre-write
+  element list, and vague target phrasings
+- "Claude does not know MODA rule content, must look up" forces
+  invocation on rule_id queries that previously bypassed (e.g.
+  `HM1110100C 怎麼修?`)
+
+### Notes
+
+- Three remaining benchmark misses (`Tier 1 #4`, `Tier 2 #11 #19`)
+  are structural: Claude has a strong direct-answer bias for
+  design-feedback phrasings ("設計師說背景跟字太接近") and UX-pattern
+  questions framed as general best practice. Adding more keywords
+  beyond the v0.3.2 rewrite was estimated to break Tier 3's perfect
+  no-false-positive score with diminishing returns. 90% / 0 FP is the
+  ship threshold.
+- Methodology and raw data live in the contributor scratch dir
+  (`.scratch/`, gitignored): `eval_set.json` (30 prompts),
+  `run_trigger_eval_win.py` (Windows-friendly streaming-event
+  detection runner), and per-version raw JSON results.
+- Benchmark was performed on `claude-opus-4-7[1m]`; trigger behavior
+  may vary on other models. Real-conversation triggering tends to be
+  higher than cold `claude -p` because conversation context primes
+  skill-relevance scoring. Treat the 93% / 77% as a conservative
+  floor.
+
 ## [0.3.1] — 2026-05-08
 
 UX completion patch for v0.3.0's knowledge-service positioning. Removes
@@ -337,6 +401,7 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

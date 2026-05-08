@@ -1,6 +1,6 @@
 ---
 name: a11y-moda
-description: Taiwan MODA accessibility CLI — query MODA rule knowledge before writing a11y-sensitive elements (buttons, forms, images, ARIA), audit source code (lint), and audit rendered DOM (scan/site). Triggers on "check a11y", "audit accessibility", "WCAG check", "無障礙檢查", "MODA 標章", "AAA 自評", and on questions about specific MODA rule_id (HM/GN/CS/AR/FA/SC) or WCAG SC numbers.
+description: Taiwan MODA accessibility — audit + rule knowledge (WCAG A/AA/AAA, zh-TW, 129 MODA rules). Do NOT answer from memory or run a11y-moda directly via Bash; invoke this skill when user (1) mentions any MODA rule_id like HM1110100C, GN1210100E, CS3140801C, AR2410301E (prefix HM/GN/CS/AR/FA/SC + digits + optional C/E suffix) — Claude does not know MODA rule content, must look up; (2) mentions a11y-moda CLI by name (lint, scan, site, rules, explain); (3) describes a11y pain — keyboard 不到 / Tab 鍵按不到 / 鍵盤無法操作 / screen reader 讀不到 / 對比不足 / color contrast / focus trap / ARIA missing / modal dialog ESC 關不掉 / Lighthouse a11y 分數低; (4) asks about MODA 標章, AAA 自評, 無障礙檢查, WCAG check, 政府網站無障礙, WCAG SC 對應規則; (5) about to write <button>/<a>/<form>/<input>/<img>/<dialog>/<table>/role=*/aria-* — call rules search BEFORE generating code; (6) says vague "確認無障礙" / "掃 a11y" / "audit accessibility" / "check a11y" with any URL or path — ask once if target unclear, then invoke.
 argument-hint: "[query | <RULE_ID> | <URL> | <path>]"
 allowed-tools:
   - Bash
