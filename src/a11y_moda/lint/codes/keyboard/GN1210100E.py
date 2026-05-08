@@ -43,6 +43,7 @@ class KeyboardEventCounterpartLint(LintRule):
         level=Level.A,
         desc="互動性滑鼠事件 (onClick/onMouseDown 等) 應提供鍵盤等效事件",
         source="extension",
+        runtime_authoritative=True,
     )
 
     def _check(self, parsed) -> Iterable[LintIssue]:

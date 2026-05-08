@@ -50,6 +50,19 @@ class LintRule(ABC):
                 # Backfill file_path if rule forgot.
                 if not issue.file_path:
                     issue.file_path = str(parsed.path)
+                # Downgrade fail → caveat for rules whose verdict requires
+                # runtime evidence (rendered DOM, computed CSS, cross-file
+                # event wiring). AST alone cannot prove the violation; the
+                # finding stays surfaced as caveat ("needs review") rather
+                # than fail ("must fix"). The scan stage, which has
+                # Playwright + computed style, can still emit fail.
+                if (issue.status == "fail"
+                        and getattr(self.meta, "runtime_authoritative", False)):
+                    issue.status = "caveat"
+                    issue.message = (
+                        f"{issue.message}（lint 無法跨檔/runtime 確認，"
+                        f"請人工或 a11y-moda scan 驗證）"
+                    )
                 out.append(issue)
         except Exception as e:
             out.append(LintIssue(

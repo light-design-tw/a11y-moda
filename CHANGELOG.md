@@ -7,6 +7,47 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-08
+
+Patch — sharper definition of `lint` `fail` vs `caveat`. Triggered by
+real-world dogfood: a `<div onClick={onClose} role="dialog">` modal
+backdrop fired `fail` for `GN1210100E` ("missing keyboard handler"),
+but the keyboard close path lived in a sibling `<button aria-label="關閉">`
+plus a top-of-component `useHotkeys("esc", onClose)` — both invisible
+to single-file AST. Marking such cases `fail` is wrong: AST literally
+cannot prove the violation, only suggest review.
+
+### Changed
+- `RuleMeta` gains `runtime_authoritative: bool = False`. Rules whose
+  verdict requires rendered DOM, computed CSS, focus traversal, or
+  cross-file event wiring (which AST cannot reach) set this to `True`.
+- `lint` runner now downgrades `fail` → `caveat` for any rule with
+  `runtime_authoritative=True`, appending an explanatory note to the
+  message: 「lint 無法跨檔/runtime 確認，請人工或 a11y-moda scan 驗證」.
+  `scan` is unaffected — it has Playwright + computed style and can
+  emit `fail` authoritatively for the same rules.
+- Marked `runtime_authoritative=True`:
+  - `GN1210100E` — onClick / mouse handler missing keyboard equivalent
+    (cross-file `useHotkeys` / sibling button invisible to AST)
+  - `FA2141104E` — `<style>` outline:none without `:focus` rule
+    (external CSS files invisible to lint)
+- Other lint rules already emit `info` or `caveat` and are unaffected.
+
+### Notes
+- This is a **definition fix**, not a tuning knob. `lint`'s `fail`
+  status now means "AST proved a violation"; ambiguous cases are
+  `caveat` regardless of runtime severity. Users who want hard
+  keyboard gating in CI should run `a11y-moda scan` (which has the
+  evidence to fail).
+- Per-project `--ignore` / config file is **not** added in this patch
+  (YAGNI). Will revisit if real demand surfaces.
+- Dogfood after patch: light-design AAA, 135 files, **0 fail / 31 caveat
+  / 0 info** (real `<div onClick>` accordions in Footer + Faq were fixed
+  to `<button type="button">` between releases; Modal backdrop cleanly
+  downgrades to caveat with the new note).
+
+[0.2.1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.2.1
+
 ## [0.2.0] — 2026-05-08
 
 Two big additions, both targeting the **write/build** stage of the
@@ -154,6 +195,6 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.2.1...HEAD
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
 [0.1.0a1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0a1

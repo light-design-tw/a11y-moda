@@ -25,6 +25,7 @@ class OutlineNoneNoFallbackLint(LintRule):
         level=Level.AA,
         desc="<style> 含 outline:none 但無 :focus / :focus-visible 替代",
         source="extension",
+        runtime_authoritative=True,
     )
 
     def _check(self, parsed) -> Iterable[LintIssue]:

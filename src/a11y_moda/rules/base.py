@@ -18,6 +18,13 @@ class RuleMeta:
     # source = "freego" → rule covered by the official MODA tool's machine checks;
     # source = "extension" → an E (人工/manual) rule we automated programmatically.
     source: str = "freego"
+    # runtime_authoritative=True means the rule's verdict requires runtime
+    # evidence (rendered DOM, computed CSS, focus traversal, cross-file event
+    # wiring) that source-only AST cannot reach. The lint runner downgrades
+    # any "fail" from such a rule to "caveat" — AST literally cannot prove
+    # the violation, only suggest review. The scan runner ignores this flag
+    # (it has Playwright + computed style and can fail authoritatively).
+    runtime_authoritative: bool = False
 
 
 @dataclass
