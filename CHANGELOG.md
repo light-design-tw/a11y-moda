@@ -7,6 +7,49 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-05-09
+
+Documentation patch — sync `README.md` + `README.en.md` to reflect
+features shipped in 0.2.0 / 0.2.1 / 0.3.0 / 0.3.1 / 0.3.2 that were
+documented in CHANGELOG but never propagated to README. PyPI's package
+page renders README, so three releases of new functionality were
+invisible to anyone landing on https://pypi.org/project/a11y-moda/ —
+they would still see the pre-0.2.0 "scan / site only" framing.
+
+No code change. PyPI wheel is bit-for-bit equivalent to 0.3.3 except
+for the README rendered on the package page.
+
+### Changed (docs)
+
+- **`README.md`** — restructured around the three-layer mental model
+  (`lint` write-time / `rules` knowledge service / `scan` runtime).
+  Adds dedicated sections for each command. Adds "lint vs scan"
+  decision table. Splits install into standard (~30MB) and `[scan]`
+  extra (~290MB) with the v0.3.0 BREAKING change called out at the
+  top of Install. Verbose flag tables and the AAA mechanism breakdown
+  collapsed into `<details>` so above-the-fold stays scannable. TOC
+  added.
+- **`README.en.md`** — mirror of the zh-TW restructure. Same sections
+  in English, no `<details>` collapse (English README is shorter
+  overall and serves as a pointer to the zh-TW for full detail).
+- **Tagline** — both READMEs updated from "scan / site CLI" framing
+  to "lint + scan + rule lookup" to match the v0.3.0 knowledge-service
+  reframing.
+
+### Notes
+
+- **Why this took until 0.3.4** — diagnosed during a PyPI page review.
+  Root cause: no release SOP enforced README sync alongside CHANGELOG
+  bumps. Fixed in `freego_cli/CLAUDE.md` (parent monorepo doc) under
+  the new "發版檢查清單 (release SOP)" section, and in this project's
+  contributor memory as `feedback_release_readme_sync`.
+- **Why a patch (not minor)** — the underlying CLI surface, rule set,
+  and behaviour are unchanged from 0.3.3. Only the rendered package
+  page on PyPI changes. SemVer-wise this is the smallest version bump
+  that triggers a PyPI republish.
+
+[0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
+
 ## [0.3.3] — 2026-05-08
 
 Engineering scaffolding patch — adds the `tests/` directory the
@@ -465,7 +508,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2
 [0.1.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.1.0
