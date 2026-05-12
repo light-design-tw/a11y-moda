@@ -7,9 +7,55 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable
 
 from .fetcher import fetch, fetch_with_page
-from .models import Level, PageReport, ScanReport
+from .models import Issue, Level, PageReport, ScanReport
 from .rules import all_rules
 from .rules.base import RuleContext
+
+
+_DARK_PREFIX = "[深色模式] "
+
+
+def _merge_dark_into_page(light: PageReport, dark: PageReport) -> PageReport:
+    """Append dark-only issues to a light page report. Tags them with a
+    [深色模式] prefix so reports clearly attribute which color scheme
+    surfaced each issue.
+
+    Equality key = (rule_id, snippet, message). A dark issue equal to a
+    light issue is dropped as duplicate (most rules will fire identically
+    in both schemes; only contrast / theme-dependent ones differ).
+    """
+    light_keys = {(i.rule_id, i.snippet, i.message) for i in light.issues}
+    for issue in dark.issues:
+        key = (issue.rule_id, issue.snippet, issue.message)
+        if key in light_keys:
+            continue
+        light.issues.append(Issue(
+            rule_id=issue.rule_id,
+            guideline=issue.guideline,
+            level=issue.level,
+            desc=issue.desc,
+            message=_DARK_PREFIX + issue.message,
+            snippet=issue.snippet,
+            url=issue.url,
+            status=issue.status,
+        ))
+    return light
+
+
+def merge_dark_into_report(light: ScanReport, dark: ScanReport) -> ScanReport:
+    """Merge a dark-mode scan into a light scan. Same-URL pages get their
+    dark-only issues appended (with [深色模式] prefix). Dark-only URLs
+    (rare — sitemap should match) are appended as-is with prefix on each
+    issue."""
+    by_url = {p.url: p for p in light.pages}
+    for dark_page in dark.pages:
+        if dark_page.url in by_url:
+            _merge_dark_into_page(by_url[dark_page.url], dark_page)
+        else:
+            for i in dark_page.issues:
+                i.message = _DARK_PREFIX + i.message
+            light.pages.append(dark_page)
+    return light
 
 
 class _RateLimiter:

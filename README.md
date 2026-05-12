@@ -163,7 +163,7 @@ a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-aud
 
 `--allow-file` opt-in 才放行 `file://`。預設關閉，避免外部 redirect 騙工具讀本地檔。Windows 反斜線路徑 (`D:\dist\index.html`) 跟 POSIX 路徑都接受。
 
-**`--dark-mode` (since v0.4.0)** — 設定 Playwright `prefers-color-scheme=dark`，讓深色主題網站以深色變體渲染。設計系統的對比度 bug 多半藏在深色變體，預設 light 掃描看不到。建議 light + dark 各跑一次以完整覆蓋。需搭配 `--render`。
+**`--dark-mode` (since v0.4.0；v0.4.1 改為自動雙跑)** — 自動跑 **light + dark 兩次**並合併結果。深色主題下才出現的 issue 會在 message 加上 `[深色模式]` 前綴標示。設計系統的對比度 bug 多半藏在深色變體，預設 light 掃描看不到。需搭配 `--render`。
 
 **新增的 runtime probe (since v0.4.0)** — `--render` 模式下自動跑：
 - **焦點陷阱偵測** (`tools/dialog_probe.py`) — 自動找 hamburger / dialog trigger，按 Tab N 次驗證焦點是否被 trap 在開啟容器內。MODA 對 1.4.1 / 2.4.3 / 2.4.7 的人工審查最常打回的點。

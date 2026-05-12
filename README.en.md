@@ -160,7 +160,7 @@ a11y-moda scan ./dist/index.html --allow-file --render
 a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-audit.html
 ```
 
-**`--dark-mode` (since v0.4.0)** sets Playwright `prefers-color-scheme=dark` so dark-themed sites render in their dark variant. Most contrast bugs in design systems live in the dark variant; default light scans miss them. Run twice (light + dark) for full coverage. Requires `--render`.
+**`--dark-mode` (since v0.4.0; v0.4.1 auto dual-pass)** runs the scan **twice** — once in light, once in dark — and merges results. Dark-only issues are tagged `[深色模式]` in the message. Most contrast bugs in design systems live in the dark variant; default light scans miss them. Requires `--render`.
 
 **New runtime probes (since v0.4.0)** — automatically run in `--render` mode:
 

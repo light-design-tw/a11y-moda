@@ -330,9 +330,10 @@ def _lint_to_markdown(report) -> str:
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
 @click.option("--dark-mode", is_flag=True, default=False,
-              help="Emulate prefers-color-scheme=dark before scanning. Most contrast bugs "
-                   "in design systems live in the dark variant; default light scans miss them. "
-                   "Requires --render. Run twice (light + dark) for full coverage.")
+              help="Also scan in prefers-color-scheme=dark and merge findings. "
+                   "Runs the scan TWICE (light then dark) — most contrast bugs in design "
+                   "systems live only in the dark variant. Dark-only issues are tagged "
+                   "[深色模式] in the merged report. Requires --render.")
 @click.option("--strict-third-party", is_flag=True, default=False,
               help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
@@ -360,11 +361,24 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
     _enforce_url_safety(url, allow_private=allow_private_hosts, allow_file=allow_file)
     sources = {"freego"} if (freego_only or no_extension) else None
     llm = _build_llm(llm_base_url, llm_key, llm_model)
-    report = scan_page(url, level=Level[level], render=render,
-                       freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
-                       llm_workers=llm_concurrency, probe_modals=probe_modals,
-                       strict_third_party=strict_third_party,
-                       color_scheme="dark" if dark_mode else None)
+
+    def _scan(scheme: str | None):
+        return scan_page(url, level=Level[level], render=render,
+                         freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
+                         llm_workers=llm_concurrency, probe_modals=probe_modals,
+                         strict_third_party=strict_third_party, color_scheme=scheme)
+
+    if dark_mode and render:
+        # Two passes — light first, dark second. Merged at PageReport level.
+        from .scanner import _merge_dark_into_page
+        click.echo("scanning in light mode (1/2)...", err=True)
+        light_page = _scan(None)
+        click.echo("scanning in dark mode (2/2)...", err=True)
+        dark_page = _scan("dark")
+        report = _merge_dark_into_page(light_page, dark_page)
+    else:
+        report = _scan("dark" if dark_mode else None)
+
     if fail_only:
         report.issues = [i for i in report.issues if i.status == "fail"]
     fmt = _resolve_fmt(fmt, output)
@@ -413,9 +427,10 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
 @click.option("--dark-mode", is_flag=True, default=False,
-              help="Emulate prefers-color-scheme=dark before scanning. Most contrast bugs "
-                   "in design systems live in the dark variant; default light scans miss them. "
-                   "Requires --render. Run twice (light + dark) for full coverage.")
+              help="Also scan in prefers-color-scheme=dark and merge findings. "
+                   "Runs the scan TWICE (light then dark) — most contrast bugs in design "
+                   "systems live only in the dark variant. Dark-only issues are tagged "
+                   "[深色模式] in the merged report. Requires --render.")
 @click.option("--strict-third-party", is_flag=True, default=False,
               help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
@@ -473,13 +488,24 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
 
     sources = {"freego"} if (freego_only or no_extension) else None
     llm = _build_llm(llm_base_url, llm_key, llm_model)
-    scan_report = scan_urls(urls, level=Level[level], render=render,
-                            freego_compat=freego_compat, ignore=ignore,
-                            workers=workers, progress=True, delay=delay, rps=rps,
-                            sources=sources, llm=llm, llm_workers=llm_concurrency,
-                            probe_modals=probe_modals,
-                            strict_third_party=strict_third_party,
-                            color_scheme="dark" if dark_mode else None)
+    def _site_scan(scheme: str | None):
+        return scan_urls(urls, level=Level[level], render=render,
+                         freego_compat=freego_compat, ignore=ignore,
+                         workers=workers, progress=True, delay=delay, rps=rps,
+                         sources=sources, llm=llm, llm_workers=llm_concurrency,
+                         probe_modals=probe_modals,
+                         strict_third_party=strict_third_party,
+                         color_scheme=scheme)
+
+    if dark_mode and render:
+        from .scanner import merge_dark_into_report
+        click.echo("scanning in light mode (1/2)...", err=True)
+        light_report = _site_scan(None)
+        click.echo("scanning in dark mode (2/2)...", err=True)
+        dark_report = _site_scan("dark")
+        scan_report = merge_dark_into_report(light_report, dark_report)
+    else:
+        scan_report = _site_scan("dark" if dark_mode else None)
     if llm:
         print(f"LLM stats: {llm.stats}", file=sys.stderr)
     if fail_only:

@@ -7,6 +7,79 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-05-12
+
+Patch fixing two real-audit gaps that v0.4.0 dogfood scan revealed:
+
+1. `CS2240700E` (skip-link target focus) was emitting nothing on
+   `light-design.com.tw` even though the MODA AAA report flagged
+   exactly this pattern. Root cause: the `dialog_probe` correctly
+   pressed Enter on the skip link, but browsers do not move keyboard
+   focus on `<a href="#x">` activation unless the target carries
+   `tabindex="-1"`. The probe's `opened` flag stayed False. The rule
+   only fired when `opened=True AND visible_focus=False`, so the
+   "Enter pressed but focus didn't move" case (the most common
+   violation) was silently passed.
+
+2. `--dark-mode` was a one-or-the-other switch — it scanned ONLY in
+   dark mode, replacing the default light scan instead of adding to
+   it. Most contrast bugs only appear in one variant; the other has
+   to be re-scanned manually. Now `--dark-mode` runs both passes and
+   merges, with dark-only issues prefixed `[深色模式]` so the merged
+   report makes attribution obvious.
+
+Coverage delta on the 9-finding MODA AAA audit (light-design.com.tw,
+2026-05-12 dogfood): 5/9 stable HITs in v0.4.0 → 5/9 stable HITs in
+v0.4.1, but the *quality* improved — `CS2240700E` is now a true
+match and `GN2140300E` aligns to the MODA-flagged dark-mode contrast
+segment instead of an unrelated light-mode segment. `GN1220200E`
+(carousel pause) remains intermittent due to Wix Reviews lazy-mount
+timing — pre-existing flake, not regressed by this release.
+
+### Added
+
+- **`DialogProbeResult.skip_link_found`** — distinguishes "probe
+  found a skip link and pressed Enter" from "probe found nothing".
+  Required so `CS2240700E` can fire on the "Enter pressed but focus
+  didn't move" case without false-firing on pages that simply lack a
+  skip link (the latter is `GN1240100E`'s domain).
+- **`scanner.merge_dark_into_report` + `_merge_dark_into_page`** —
+  combines a dark-mode `ScanReport` / `PageReport` into the
+  corresponding light report. Dark-only issues (after exact
+  `(rule_id, snippet, message)` dedup) get the `[深色模式]` prefix.
+
+### Changed
+
+- **`CS2240700E`** — now emits two distinct fail messages:
+  - `Enter 後焦點未跳至目標元素` when the skip link was activated but
+    `document.activeElement` did not become the target (most common
+    violation — target lacks `tabindex="-1"`).
+  - `焦點已跳至目標但目標元素無可見焦點指示` when focus did move but
+    the target's `:focus-visible` style is empty (existing case,
+    refined wording).
+- **`--dark-mode` flag semantics** — was "scan only in dark"; is now
+  "scan in light AND dark, merge results". Behavioral change for
+  anyone scripting against the flag, but more useful in practice
+  (dual coverage in one command). Help text updated.
+
+### Notes
+
+- **Flake disclosure** — `GN1220200E` (carousel pause) detection
+  depends on Wix Reviews lazy-mounting before the 4.5s observation
+  window expires. On `light-design.com.tw` this hits ~50% of runs.
+  Not regressed by 0.4.1; will be addressed in a follow-up via
+  pre-probe scroll + extended observation when no motion is detected
+  in the first window.
+- **Why 0.4.1 not 0.4.0.1** — `--dark-mode` semantic change is a
+  user-visible behavior shift. SemVer-strict would call this minor,
+  but pre-1.0 we keep it as patch since the flag was new in 0.4.0
+  and the new behavior is what users actually wanted.
+- **No README rewrite needed** — `--dark-mode` description in README
+  already said "Run twice (light + dark) for full coverage" — the
+  CLI now matches what the README promised.
+
+[0.4.1]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.1
+
 ## [0.4.0] — 2026-05-12
 
 Real-audit-driven release — first MODA AAA inspection report on
@@ -607,7 +680,7 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.1...HEAD
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2

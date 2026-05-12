@@ -25,10 +25,11 @@ class DialogProbeResult:
     trigger_text: str
     trigger_selector: str
     kind: str           # "menu" | "modal" | "skip-link"
-    opened: bool        # click visibly changed page state
+    opened: bool        # click visibly changed page state (for skip-link: focus moved to target)
     focus_trapped: bool # all Tab stops stayed inside opened container
     escape_closes: bool # Esc returned focus to trigger AND closed
     skip_target_visible_focus: bool = False  # only for skip-link
+    skip_link_found: bool = False  # only for skip-link: probe located the link AND pressed Enter
     container_selector: str = ""
     tab_stops_inside: int = 0
     tab_stops_outside: int = 0
@@ -321,6 +322,13 @@ def _probe_skip_link(page) -> DialogProbeResult | None:
             return res
         page.keyboard.press("Enter")
         page.wait_for_timeout(200)
+        # We pressed Enter on the skip link — record this regardless of
+        # whether focus actually moved to the target. The MOST common
+        # MODA finding under 2.4.7 is "Enter pressed but target didn't
+        # receive focus" (target lacks tabindex=-1), which presents as
+        # opened=False. CS2240700E uses skip_link_found to distinguish
+        # this from "no skip link exists" (which is GN1240100E's domain).
+        res.skip_link_found = True
         target = page.evaluate(_SKIP_TARGET_FOCUS_JS, info["href"])
         if not target.get("found"):
             res.error = f"skip target {info['href']} not found"

@@ -22,16 +22,29 @@ class FocusVisible(Rule):
             return
 
         # Skip-link target visibility — when user activates "跳至主要內容",
-        # the destination element should show a focus indicator. MODA flags
-        # silent skip targets under 2.4.7.
+        # the destination element should (a) actually receive focus and
+        # (b) show a visible focus indicator. Browsers do NOT move focus
+        # on plain `<a href="#x">` activation — the target needs
+        # tabindex="-1" for focus to follow the URL fragment. MODA flags
+        # both "focus didn't move" and "focus moved but invisible".
         for d in getattr(ctx, "dialog_probes", []) or []:
-            if d.kind != "skip-link":
+            if d.kind != "skip-link" or not d.skip_link_found:
                 continue
-            if d.opened and not d.skip_target_visible_focus:
+            if not d.opened:
                 report.add(self._issue(
                     message=(
-                        f"跳到主要內容連結「{d.trigger_text}」啟用後，目標位置無可見焦點指示，"
-                        f"使用者不知道焦點已跳至何處。請在跳轉目標元素加上 :focus-visible 樣式。"
+                        f"「{d.trigger_text}」連結按 Enter 後，焦點未跳至目標元素 — "
+                        f"目標通常缺 tabindex=\"-1\"，瀏覽器只會 scroll 但不會 move focus。"
+                        f"請於目標元素加上 tabindex=\"-1\" 並設置 :focus-visible 樣式。"
+                    ),
+                    snippet=f"trigger={d.trigger_selector}",
+                ))
+                break
+            if not d.skip_target_visible_focus:
+                report.add(self._issue(
+                    message=(
+                        f"「{d.trigger_text}」啟用後焦點已跳至目標，但目標元素無可見焦點指示 — "
+                        f"使用者不知道焦點已落在何處。請在跳轉目標加上 :focus-visible 樣式。"
                     ),
                     snippet=f"trigger={d.trigger_selector}",
                 ))
