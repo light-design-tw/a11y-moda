@@ -19,10 +19,18 @@ COLLECT_FOCUS_JS = r"""
 () => {
     const el = document.activeElement;
     if (!el || el === document.body) return null;
+    // The element IS focused right now (we just pressed Tab to it), so the
+    // regular computed style already includes the :focus / :focus-visible
+    // cascade. Do NOT pass ':focus-visible' as second arg — getComputedStyle
+    // accepts only pseudo-ELEMENTS (::before/::after/::marker), not pseudo-
+    // CLASSES. Chromium silently falls back to the non-focus style when given
+    // a pseudo-class, producing false negatives ("no focus indicator" when
+    // one is actually present).
     const cs = getComputedStyle(el);
-    const psFocus = getComputedStyle(el, ':focus-visible');
-    const focusOutline = psFocus.outlineStyle !== 'none' && psFocus.outlineWidth !== '0px';
-    const focusBoxShadow = psFocus.boxShadow !== 'none' && psFocus.boxShadow !== cs.boxShadow;
+    const focusOutline = cs.outlineStyle && cs.outlineStyle !== 'none' &&
+                         cs.outlineWidth !== '0px' &&
+                         cs.outlineColor !== 'transparent';
+    const focusBoxShadow = cs.boxShadow && cs.boxShadow !== 'none';
     const rect = el.getBoundingClientRect();
     const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight && rect.width > 0;
     let selector = el.tagName.toLowerCase();

@@ -7,6 +7,63 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-05-12
+
+Probe correctness patch — fixes a pseudo-class misuse in
+`tools/dialog_probe.py` and `tools/tab_walk.py` that caused
+`CS2240700E` (and indirectly any Tab-walk-derived focus-visibility
+check) to false-positive on every site that correctly set a
+`:focus-visible` outline.
+
+Found via dogfood after fixing light-design.com.tw's actual focus
+issues — site author's `<main tabIndex={-1}>` + global outline rules
+verified working in DevTools (outlineStyle=solid width=3px under
+focus), but `a11y-moda` v0.4.1 still reported the rule as fail.
+
+### Fixed
+
+- **`tools/dialog_probe.py` `_SKIP_TARGET_FOCUS_JS`** — removed
+  `getComputedStyle(target, ':focus-visible')`. The second argument
+  to `getComputedStyle` accepts only **pseudo-elements** (`::before`,
+  `::after`, `::marker`); passing a **pseudo-class** like
+  `:focus-visible` is invalid and Chromium silently falls back to
+  the non-focus computed style (Firefox returns null). When the
+  target is currently focused (skip link Enter has moved focus to it
+  via `tabindex="-1"`), reading the regular computed style already
+  includes the `:focus`/`:focus-visible` cascade — that's the
+  correct read.
+- **`tools/tab_walk.py` `COLLECT_FOCUS_JS`** — same fix. Each Tab
+  press makes the new element `document.activeElement`; reading
+  regular computed style already reflects the focused-state cascade.
+- **`CS2240700E` correctness restored** — sites with valid
+  `:focus-visible` outline + `tabindex="-1"` skip targets now
+  correctly pass instead of false-firing.
+
+### Notes
+
+- **Why this slipped past v0.4.0/0.4.1 dogfood** — light-design.com.tw
+  had no skip-link target focus indicator in those versions, so the
+  rule was firing on a real underlying issue and passing the eye
+  test. Bug surfaced only after the site author shipped the actual
+  fix. Lesson: probes need fixture-style positive controls in
+  addition to dogfood, not just sites that currently violate.
+- **Per-page nuance on light-design (post-0.4.2)** — homepage and
+  pricing now PASS `CS2240700E` (probe correctly reads the new
+  outline cascade); about-us / contact / works still report fail.
+  This is a probe heuristic limitation, not a recurrence of the
+  pseudo-class bug — `dialog_probe` runs after `carousel_probe`'s
+  4.5s observation, and the page state (scroll position, focus
+  location) sometimes prevents the Tab-from-body walk from reaching
+  the skip link in 5 presses. Investigating in 0.4.3 (likely:
+  scroll-to-top + focus-body before each probe).
+- **Acknowledgement** — bug diagnosis comes from the
+  light-design.com.tw author who verified outline was applied via
+  Playwright at the same time `a11y-moda` was still reporting fail.
+  Real-world dogfood found a class of bug that synthetic fixtures
+  would have missed.
+
+[0.4.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.2
+
 ## [0.4.1] — 2026-05-12
 
 Patch fixing two real-audit gaps that v0.4.0 dogfood scan revealed:
@@ -680,7 +737,7 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.2...HEAD
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2

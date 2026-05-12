@@ -232,15 +232,24 @@ _SKIP_TARGET_FOCUS_JS = r"""
     const id = targetId.replace(/^#/, '');
     const target = document.getElementById(id);
     if (!target) return { found: false };
-    const ae = document.activeElement;
-    const onTarget = ae === target;
-    // Check :focus-visible style on target.
+    const onTarget = document.activeElement === target;
+    // getComputedStyle's second arg accepts only pseudo-ELEMENTS (::before/
+    // ::after/::marker) — passing a pseudo-CLASS like ':focus-visible' is
+    // invalid syntax. Chromium silently falls back to the non-focus
+    // computed style, masking outline rules that only apply when focused.
+    // When the target is currently focused (skip link Enter has moved
+    // focus to it via tabindex=-1), reading the regular computed style
+    // already includes :focus / :focus-visible cascade — that's what we
+    // want.
     let visible = false;
-    try {
-        const ps = getComputedStyle(target, ':focus-visible');
-        visible = (ps.outlineStyle && ps.outlineStyle !== 'none' && ps.outlineWidth !== '0px') ||
-                  (ps.boxShadow && ps.boxShadow !== 'none');
-    } catch (e) {}
+    if (onTarget) {
+        const cs = getComputedStyle(target);
+        const outlineVisible = cs.outlineStyle && cs.outlineStyle !== 'none' &&
+                                cs.outlineWidth !== '0px' &&
+                                cs.outlineColor !== 'transparent';
+        const boxShadowVisible = cs.boxShadow && cs.boxShadow !== 'none';
+        visible = outlineVisible || boxShadowVisible;
+    }
     return { found: true, focused: onTarget, visibleFocus: visible };
 }
 """
