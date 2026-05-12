@@ -18,7 +18,26 @@ class FocusVisible(Rule):
     )
 
     def _check(self, soup: BeautifulSoup, report: PageReport, *, html: str, url: str, ctx) -> None:
-        if not ctx.browser_used or not ctx.tab_stops:
+        if not ctx.browser_used:
+            return
+
+        # Skip-link target visibility — when user activates "跳至主要內容",
+        # the destination element should show a focus indicator. MODA flags
+        # silent skip targets under 2.4.7.
+        for d in getattr(ctx, "dialog_probes", []) or []:
+            if d.kind != "skip-link":
+                continue
+            if d.opened and not d.skip_target_visible_focus:
+                report.add(self._issue(
+                    message=(
+                        f"跳到主要內容連結「{d.trigger_text}」啟用後，目標位置無可見焦點指示，"
+                        f"使用者不知道焦點已跳至何處。請在跳轉目標元素加上 :focus-visible 樣式。"
+                    ),
+                    snippet=f"trigger={d.trigger_selector}",
+                ))
+                break
+
+        if not ctx.tab_stops:
             return
         invisible = [s for s in ctx.tab_stops if not s.has_visible_outline]
         if not invisible:

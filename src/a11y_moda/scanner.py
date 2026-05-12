@@ -62,6 +62,7 @@ def scan_page(
     llm_workers: int = 1,
     probe_modals: bool = False,
     strict_third_party: bool = False,
+    color_scheme: str | None = None,
 ) -> PageReport:
     """Scan one URL.
 
@@ -79,9 +80,11 @@ def scan_page(
                                         freego_compat=freego_compat, ignore=ignore,
                                         sources=sources, llm=llm, capture_shots=capture_shots,
                                         llm_workers=llm_workers, probe_modals=probe_modals,
-                                        strict_third_party=strict_third_party)
+                                        strict_third_party=strict_third_party,
+                                        color_scheme=color_scheme)
     # Standalone path — used for static scans and single-URL render scans.
-    report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots)
+    report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots,
+                                                  color_scheme=color_scheme)
     if soup is None:
         return report
     ctx = RuleContext(freego_compat=freego_compat, ignore=set(ignore), llm=llm,
@@ -90,13 +93,19 @@ def scan_page(
         ctx.state["strict_aaa"] = True
     if strict_third_party:
         ctx.state["strict_third_party"] = True
+    if color_scheme:
+        ctx.state["color_scheme"] = color_scheme
     if render:
         try:
             from .tools.contrast import collect_text_samples
             from .tools.tab_walk import walk_tab_stops
             from .tools.form_probe import probe_forms
+            from .tools.dialog_probe import probe_dialogs
+            from .tools.carousel_probe import probe_carousels
             ctx.text_samples = collect_text_samples(url)
             ctx.tab_stops = walk_tab_stops(url)
+            ctx.carousel_probes = probe_carousels(url)
+            ctx.dialog_probes = probe_dialogs(url)
             ctx.form_sims = probe_forms(url, try_modal_triggers=probe_modals)
             ctx.browser_used = True
         except Exception as e:
@@ -106,7 +115,7 @@ def scan_page(
     return report
 
 
-def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1, probe_modals: bool = False, strict_third_party: bool = False) -> PageReport:
+def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sources, llm, capture_shots, llm_workers: int = 1, probe_modals: bool = False, strict_third_party: bool = False, color_scheme: str | None = None) -> PageReport:
     """Render path using a shared browser. Fresh context per URL (incognito
     isolation), shared page across fetch + 3 probes (contrast/tab_walk/form).
     Form probe runs LAST because it mutates page state (clicks modal triggers).
@@ -115,7 +124,9 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
     from .tools.contrast import collect_text_samples_from_page
     from .tools.tab_walk import walk_tab_stops_from_page
     from .tools.form_probe import probe_forms_from_page
-    with page_session(browser) as page:
+    from .tools.dialog_probe import probe_dialogs_from_page
+    from .tools.carousel_probe import probe_carousels_from_page
+    with page_session(browser, color_scheme=color_scheme) as page:
         report, soup, html, full_png, vp_png = fetch_with_page(
             page, url, capture_screenshot=capture_shots,
         )
@@ -127,9 +138,18 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
             ctx.state["strict_aaa"] = True
         if strict_third_party:
             ctx.state["strict_third_party"] = True
+        if color_scheme:
+            ctx.state["color_scheme"] = color_scheme
         try:
             ctx.text_samples = collect_text_samples_from_page(page)
             ctx.tab_stops = walk_tab_stops_from_page(page)
+            # Carousel probe needs ~4.5s of pristine observation to detect
+            # auto-rotation, so it runs before any state-mutating probe.
+            ctx.carousel_probes = probe_carousels_from_page(page)
+            # Dialog probe runs BEFORE form probe — both mutate state, but
+            # dialog probe needs the page in pristine state to find triggers
+            # by their initial aria-expanded=false / inert containers.
+            ctx.dialog_probes = probe_dialogs_from_page(page)
             ctx.form_sims = probe_forms_from_page(page, url, try_modal_triggers=probe_modals)
             ctx.browser_used = True
         except Exception as e:
@@ -155,6 +175,7 @@ def scan_urls(
     llm_workers: int = 1,
     probe_modals: bool = False,
     strict_third_party: bool = False,
+    color_scheme: str | None = None,
 ) -> ScanReport:
     """Parallel scan of many URLs.
 
@@ -174,7 +195,8 @@ def scan_urls(
                          freego_compat=freego_compat, ignore=ignore, sources=sources,
                          llm=llm, browser=browser, llm_workers=llm_workers,
                          probe_modals=probe_modals,
-                         strict_third_party=strict_third_party)
+                         strict_third_party=strict_third_party,
+                         color_scheme=color_scheme)
 
     if render:
         # Serial when rendering. Share one chromium across the whole site;

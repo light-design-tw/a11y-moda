@@ -329,6 +329,10 @@ def _lint_to_markdown(report) -> str:
                    "forms inside dialogs. OFF by default — clicking on production sites can "
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
+@click.option("--dark-mode", is_flag=True, default=False,
+              help="Emulate prefers-color-scheme=dark before scanning. Most contrast bugs "
+                   "in design systems live in the dark variant; default light scans miss them. "
+                   "Requires --render. Run twice (light + dark) for full coverage.")
 @click.option("--strict-third-party", is_flag=True, default=False,
               help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
@@ -341,7 +345,7 @@ def _lint_to_markdown(report) -> str:
 def scan(url: str, level: str, render: bool, freego_compat: bool,
          ignore: tuple[str, ...], freego_only: bool, no_extension: bool,
          fail_only: bool, allow_private_hosts: bool, allow_file: bool,
-         probe_modals: bool,
+         probe_modals: bool, dark_mode: bool,
          strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
@@ -350,6 +354,8 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
     if render:
         from .fetcher import ensure_playwright_or_die
         ensure_playwright_or_die("scan --render")
+    if dark_mode and not render:
+        click.echo("warning: --dark-mode has no effect without --render (static fetch can't emulate color scheme)", err=True)
     url = _resolve_url(url, allow_file=allow_file)
     _enforce_url_safety(url, allow_private=allow_private_hosts, allow_file=allow_file)
     sources = {"freego"} if (freego_only or no_extension) else None
@@ -357,7 +363,8 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
     report = scan_page(url, level=Level[level], render=render,
                        freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
                        llm_workers=llm_concurrency, probe_modals=probe_modals,
-                       strict_third_party=strict_third_party)
+                       strict_third_party=strict_third_party,
+                       color_scheme="dark" if dark_mode else None)
     if fail_only:
         report.issues = [i for i in report.issues if i.status == "fail"]
     fmt = _resolve_fmt(fmt, output)
@@ -405,6 +412,10 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
                    "forms inside dialogs. OFF by default — clicking on production sites can "
                    "trigger booking / billing / analytics. Destructive keywords (付款/delete/"
                    "unsubscribe …) are always skipped even when this is on.")
+@click.option("--dark-mode", is_flag=True, default=False,
+              help="Emulate prefers-color-scheme=dark before scanning. Most contrast bugs "
+                   "in design systems live in the dark variant; default light scans miss them. "
+                   "Requires --render. Run twice (light + dark) for full coverage.")
 @click.option("--strict-third-party", is_flag=True, default=False,
               help="Treat third-party resource violations (e.g. Google CSE CSS) as fail. "
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
@@ -422,7 +433,7 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          source: str, workers: int, delay: float, rps: float,
          render_crawl: bool, exclude_url: tuple[str, ...], exclude_folder: tuple[str, ...],
          max_time: float, allow_private_hosts: bool, allow_file: bool,
-         probe_modals: bool,
+         probe_modals: bool, dark_mode: bool,
          strict_third_party: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
@@ -434,6 +445,8 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
             "--render-crawl" if render_crawl and not render else "--render / --render-crawl"
         )
         ensure_playwright_or_die(f"site {flag}")
+    if dark_mode and not render:
+        click.echo("warning: --dark-mode has no effect without --render (static fetch can't emulate color scheme)", err=True)
     start_url = _resolve_url(start_url, allow_file=allow_file)
     _enforce_url_safety(start_url, allow_private=allow_private_hosts, allow_file=allow_file)
     if start_url.startswith("file://"):
@@ -465,7 +478,8 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
                             workers=workers, progress=True, delay=delay, rps=rps,
                             sources=sources, llm=llm, llm_workers=llm_concurrency,
                             probe_modals=probe_modals,
-                            strict_third_party=strict_third_party)
+                            strict_third_party=strict_third_party,
+                            color_scheme="dark" if dark_mode else None)
     if llm:
         print(f"LLM stats: {llm.stats}", file=sys.stderr)
     if fail_only:

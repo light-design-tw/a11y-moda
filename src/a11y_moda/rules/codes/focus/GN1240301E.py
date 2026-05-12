@@ -20,6 +20,23 @@ class TabOrderHasFocusables(Rule):
     def _check(self, soup: BeautifulSoup, report: PageReport, *, html: str, url: str, ctx) -> None:
         if not ctx.browser_used:
             return
+
+        # Modal / menu without focus trap → next Tab leaves the dialog and
+        # walks the underlying page. MODA AAA flags this under 2.4.3.
+        for d in getattr(ctx, "dialog_probes", []) or []:
+            if d.kind == "skip-link":
+                continue  # handled by CS2240700E
+            if d.opened and not d.focus_trapped:
+                report.add(self._issue(
+                    message=(
+                        f"觸發「{d.trigger_text}」開啟後，下一個焦點未進入該容器內，"
+                        f"鍵盤跳位順序與視覺結構不符。建議於開啟時將焦點移入容器，"
+                        f"關閉時將焦點還回觸發元件。"
+                    ),
+                    snippet=f"trigger={d.trigger_selector}",
+                ))
+                break
+
         if not ctx.tab_stops:
             report.add(self._issue(message="頁面無任何可由鍵盤聚焦之元件，鍵盤使用者無法操作。"))
             return

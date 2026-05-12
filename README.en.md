@@ -33,7 +33,7 @@ Three layers, mapped to development workflow stages:
 |---|---|---|---|
 | **`lint`** | Write / CI | Source tree-sitter AST | Pure Python, ~30MB |
 | **`rules` / `explain`** | Pre-write / agent lookup | Rule metadata query | Pure Python, ~30MB |
-| **`scan` / `site`** | Pre-deploy / production | Rendered DOM + contrast + focus probe | + Playwright, ~290MB |
+| **`scan` / `site`** | Pre-deploy / production | Rendered DOM + contrast + focus trap + carousel motion + dark-mode | + Playwright, ~290MB |
 
 Human-judgement rules (E codes) call an OpenAI-compatible endpoint. Works with OpenAI, Anthropic, OpenRouter, Ollama, vLLM, LM Studio, llama.cpp server — anything exposing `/v1/chat/completions`. The endpoint can point to a local model, so request data stays on your network.
 
@@ -117,10 +117,10 @@ CI integration:
 
 ## `rules` / `explain` — query MODA rule knowledge
 
-Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 129 rules are queryable.
+Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 131 rules are queryable.
 
 ```bash
-a11y-moda rules list                         # list all 129
+a11y-moda rules list                         # list all 131
 a11y-moda rules list --level AA              # filter by level
 a11y-moda rules list --topic forms           # filter by topic
 a11y-moda rules list --source extension      # freego (machine) / extension (E rules)
@@ -151,10 +151,22 @@ a11y-moda site https://example.com \
   --llm-base-url http://localhost:8000/v1 --llm-model qwen3-vl-8b \
   --format html -o report.html
 
+# Re-scan in dark mode (since v0.4.0)
+a11y-moda site https://example.com --render --dark-mode \
+  --level AA --format html -o report-dark.html
+
 # Local build output (Astro / Next export / Hugo / Eleventy / SvelteKit-static)
 a11y-moda scan ./dist/index.html --allow-file --render
 a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-audit.html
 ```
+
+**`--dark-mode` (since v0.4.0)** sets Playwright `prefers-color-scheme=dark` so dark-themed sites render in their dark variant. Most contrast bugs in design systems live in the dark variant; default light scans miss them. Run twice (light + dark) for full coverage. Requires `--render`.
+
+**New runtime probes (since v0.4.0)** — automatically run in `--render` mode:
+
+- **Focus-trap probe** (`tools/dialog_probe.py`) — finds hamburger / dialog triggers, clicks each, walks Tab N times, reports whether focus stayed inside the opened container. The most common MODA-audit failure on 1.4.1 / 2.4.3 / 2.4.7.
+- **Skip-link probe** — finds the skip-to-content link, presses Enter, verifies the target element shows a focus indicator.
+- **Carousel motion probe** (`tools/carousel_probe.py`) — observes `transform` / `scrollLeft` for ~4.5s. DOM motion without user interaction = auto-rotating, even for Wix / Webflow / hand-rolled carousels with no library class names.
 
 `--allow-file` is opt-in. Off by default so a redirect from a public site can't trick the scanner into reading local files. Accepts both POSIX (`/var/www/site/`) and Windows (`D:\dist\index.html`) paths.
 
@@ -206,10 +218,10 @@ a11y-moda init <ide> --force      # overwrite existing file
 
 ## Coverage highlights
 
-- **129** registered rules covering Freego's machine-checked C rules + extension E rules
+- **131** registered rules covering Freego's machine-checked C rules + extension E rules (v0.4.0 added `GN1240300E` / `GN1410200E` ARIA tab-pattern rules)
 - **20 / 20** of MODA's AAA self-evaluation questions implemented (official tool: 0)
 - **70 %** of AAA self-eval rules run without any LLM/VLM call
-- **50** `lint`-eligible source-checkable rules (subset of 129)
+- **50** `lint`-eligible source-checkable rules (subset of 131)
 - LLM endpoint can point to local models — request data stays on your network
 
 See the [中文 README](./README.md) for the full rule mechanism breakdown, command reference, and rule-authoring guide.

@@ -45,9 +45,19 @@ def shared_browser():
 
 
 @contextmanager
-def page_session(browser, *, ua: str | None = None, viewport: dict | None = None):
-    """Open a fresh context+page for one URL; cleans up on exit."""
-    ctx = browser.new_context(user_agent=ua or _DEFAULT_UA, viewport=viewport or _DEFAULT_VIEWPORT)
+def page_session(browser, *, ua: str | None = None, viewport: dict | None = None,
+                 color_scheme: str | None = None):
+    """Open a fresh context+page for one URL; cleans up on exit.
+
+    color_scheme: "light" | "dark" | "no-preference" | None. Sets Playwright's
+    emulated `prefers-color-scheme` so dark-themed sites render in their
+    dark variant — needed because dark-mode CSS often has its own contrast
+    bugs that light-mode sampling misses.
+    """
+    kwargs = {"user_agent": ua or _DEFAULT_UA, "viewport": viewport or _DEFAULT_VIEWPORT}
+    if color_scheme:
+        kwargs["color_scheme"] = color_scheme
+    ctx = browser.new_context(**kwargs)
     page = ctx.new_page()
     page.set_default_timeout(_DEFAULT_PAGE_TIMEOUT_MS)
     try:
@@ -60,12 +70,13 @@ def page_session(browser, *, ua: str | None = None, viewport: dict | None = None
 
 
 @contextmanager
-def standalone_page(*, ua: str | None = None, viewport: dict | None = None):
+def standalone_page(*, ua: str | None = None, viewport: dict | None = None,
+                    color_scheme: str | None = None):
     """One-shot browser+context+page for callers without a shared session.
 
     Used by `fetch_rendered` and the `*_url` probe wrappers — anywhere the
     caller does not already hold a Browser. Cleans both layers on exit.
     """
     with shared_browser() as browser:
-        with page_session(browser, ua=ua, viewport=viewport) as page:
+        with page_session(browser, ua=ua, viewport=viewport, color_scheme=color_scheme) as page:
             yield page

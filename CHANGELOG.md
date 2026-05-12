@@ -7,6 +7,105 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-12
+
+Real-audit-driven release — first MODA AAA inspection report on
+`light-design.com.tw` (sent 2026-04-30, returned 2026-05-12) flagged
+9 findings that v0.3.4 missed. This release closes those gaps.
+
+Two new rules + three new Playwright probes (focus-trap, skip-link,
+carousel auto-rotation) + dark-mode emulation + one logic reversal.
+No external dependency added — all gains come from `[scan]`'s existing
+Playwright. LLM/VLM still not required for any of the new checks.
+
+### Added
+
+- **`GN1240300E`** (`rules/codes/aria/`, level A, WCAG 2.4.3) — flags
+  suspected tab-pattern groups (3+ short-label siblings with
+  `tab/filter/category` class hint or `aria-selected`/`data-tab`
+  attributes) that lack `role=tablist`/`role=tab`. Surfaced as
+  `caveat` because pure HTML can't confirm UX intent.
+- **`GN1410200E`** (`rules/codes/aria/`, level A, WCAG 4.1.2) —
+  cross-checks the same suspected tab pattern as GN1240300E from the
+  ARIA name/role/value angle. Both rules can fire on the same group
+  (complementary, not duplicate).
+- **`tools/dialog_probe.py`** — Playwright probe: finds hamburger /
+  modal triggers (`aria-haspopup`, `aria-expanded`, hamburger icon
+  heuristic, hint-text), clicks each, walks Tab N times inside the
+  opened container, reports whether focus stayed trapped or escaped.
+  Also detects skip-link → target focus visibility. Result list
+  exposed as `ctx.dialog_probes` (`DialogProbeResult` dataclass).
+- **`tools/carousel_probe.py`** — Playwright probe: snapshots
+  `transform` / `scrollLeft` of likely carousel containers, waits
+  ~4.5s, snapshots again. DOM motion without user interaction = auto-
+  rotating. Catches Wix / Webflow / hand-rolled carousels that don't
+  use library class names (`swiper` / `slick` / `glide`). Result list
+  exposed as `ctx.carousel_probes` (`CarouselProbeResult` dataclass).
+- **`--dark-mode` flag** on `scan` and `site` — sets Playwright
+  `color_scheme="dark"` so dark-themed sites render in their dark
+  variant. Most contrast bugs in design systems live in the dark
+  variant; default light scans miss them. Run twice (light + dark)
+  for full coverage. Requires `--render`; warns if used without it.
+
+### Changed
+
+- **`CS1140101E`** (1.4.1) — now also fails when `dialog_probe`
+  reports a menu/modal opened but focus escaped (in addition to the
+  existing static `:focus` CSS check).
+- **`GN1240301E`** (2.4.3) — now fails when any `dialog_probe` reports
+  trigger opened a container but next Tab walked outside (focus-trap
+  missing). Existing "more than half tab stops out of viewport" check
+  retained.
+- **`CS2240700E`** (2.4.7) — now fails when `dialog_probe` reports a
+  skip-link target receives focus but has no visible focus indicator
+  at the destination. Existing per-Tab-stop `:focus-visible` audit
+  retained.
+- **`HM1240404E`** (2.4.4) — **logic direction reversed**. Previously
+  only checked links *with* a title and asked the LLM whether the
+  title was redundant. Now also detects the inverse case (the one
+  MODA flagged): repeated visible link text pointing at multiple
+  different `href`s with no disambiguating `title` / `aria-label`.
+  This direction is structural — runs without `--llm-*`. Original
+  LLM-judged direction kept as a secondary check.
+- **`GN1240500E`** (2.4.5) — no longer early-exits on the presence of
+  `<nav>` alone. MODA 2.4.5 requires multiple ways to find content,
+  so the rule now requires at least one of: programmatic nav, search,
+  or sitemap-page link. Surfaces a `caveat` when only one mechanism
+  exists and the missing one is sitemap (the case MODA flagged on
+  light-design.com.tw — has `<nav>`, no `/sitemap` page).
+- **`GN1220200E`** (2.2.2) — adds runtime auto-rotation detection via
+  `carousel_probe`. Fails when DOM motion is observed without a
+  pause/stop control nearby. Existing static class-name heuristic
+  retained as `info`-level fallback for static-only scans.
+
+### Notes
+
+- **Why this release exists** — see
+  `marketing/ithome-2026/aaa-audit-feedback-evidence.md` (parent
+  monorepo). The first AAA inspection report became the test case for
+  why automated tooling alone is insufficient and how to close the
+  most common gaps. Five root-cause categories identified: (1) focus-
+  trap unimplemented, (2) dark mode unscanned, (3) LLM rule logic
+  reversed, (4) heuristic class allowlist too narrow, (5) rule scope
+  misunderstood + 2 missing rules.
+- **No new external dependencies** — all gains from `[scan]`'s
+  existing Playwright. Standard install (`pip install a11y-moda`)
+  remains ~30MB.
+- **No VLM required** — every new check is pure Playwright + computed
+  CSS + structural analysis. Existing LLM rules unchanged. Vision
+  models not added to any code path.
+- **Probe ordering** — in shared-page scans the order is now
+  `contrast → tab_walk → carousel → dialog → form_probe`. Carousel
+  needs ~4.5s of pristine page state to detect auto-rotation; dialog
+  and form probes mutate state and run last.
+- **Coverage delta on light-design.com.tw audit** — 6 of 9 findings
+  now detectable automatically; remaining 3 (granular focus-trap
+  details that depend on container detection accuracy) emit
+  `caveat`-level prompts. Full re-scan after this release will
+  confirm the precise coverage rate.
+
+[0.4.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.0
+
 ## [0.3.4] — 2026-05-09
 
 Documentation patch — sync `README.md` + `README.en.md` to reflect
@@ -508,7 +607,7 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.0...HEAD
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2

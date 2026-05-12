@@ -139,7 +139,8 @@ def fetch_with_page(page, url: str, *, timeout_ms: int = 30000,
 
 
 def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
-                    wait_until: str = "domcontentloaded", capture_screenshot: bool = False
+                    wait_until: str = "domcontentloaded", capture_screenshot: bool = False,
+                    color_scheme: str | None = None
                     ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
     """Standalone: open own browser, navigate, capture. Used when no shared session."""
     report = PageReport(url=url)
@@ -152,7 +153,7 @@ def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
         )
         return report, None, "", None, None
     try:
-        with standalone_page(ua=ua) as page:
+        with standalone_page(ua=ua, color_scheme=color_scheme) as page:
             return fetch_with_page(page, url, timeout_ms=timeout_ms,
                                     wait_until=wait_until, capture_screenshot=capture_screenshot)
     except Exception as e:
@@ -161,10 +162,12 @@ def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
 
 
 def fetch(url: str, *, render: bool = False, timeout: float = 30.0, ua: str = _DEFAULT_UA,
-          capture_screenshot: bool = False) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
+          capture_screenshot: bool = False, color_scheme: str | None = None
+          ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
     """Returns (report, soup, html, full_png, viewport_png). PNGs only when render+capture."""
     if render:
         return fetch_rendered(url, timeout_ms=int(timeout * 1000), ua=ua,
-                              capture_screenshot=capture_screenshot)
+                              capture_screenshot=capture_screenshot,
+                              color_scheme=color_scheme)
     report, soup, html = fetch_static(url, timeout=timeout, ua=ua)
     return report, soup, html, None, None

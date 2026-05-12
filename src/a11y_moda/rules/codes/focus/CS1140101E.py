@@ -22,6 +22,22 @@ class FocusVisibleCssRule(Rule):
     _FOCUS_RE = re.compile(r":focus(-visible|-within)?\b")
 
     def _check(self, soup: BeautifulSoup, report: PageReport, *, html: str, url: str, ctx) -> None:
+        # Dialog-trigger focus behaviour: when a hamburger / dialog opens but
+        # focus does not stay inside (or no focus indicator on opened
+        # element), MODA flags this under 1.4.1. We surface that signal here
+        # in addition to the static :focus-CSS check below.
+        for d in getattr(ctx, "dialog_probes", []) or []:
+            if d.kind in ("menu", "modal") and d.opened and not d.focus_trapped:
+                report.add(self._issue(
+                    message=(
+                        f"觸發「{d.trigger_text}」開啟容器後，焦點未保留在容器內 "
+                        f"（內{d.tab_stops_inside}/外{d.tab_stops_outside}），"
+                        f"鍵盤使用者會迷失焦點位置。"
+                    ),
+                    snippet=f"trigger={d.trigger_selector} container={d.container_selector}",
+                ))
+                break  # 一頁一個樣本就夠
+
         from ....css_utils import _fetch
         from urllib.parse import urljoin
         css_blobs: list[str] = []

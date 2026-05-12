@@ -19,6 +19,22 @@ class CarouselHasPause(Rule):
     _PAUSE_HINT = re.compile(r"(pause|stop|暫停|停止)", re.IGNORECASE)
 
     def _check(self, soup, report, *, html, url, ctx) -> None:
+        # Runtime-confirmed auto-rotation (Wix / custom carousels that don't
+        # use library class names) — fail when no pause control found.
+        for c in getattr(ctx, "carousel_probes", []) or []:
+            if c.auto_rotates and not c.has_pause_control:
+                report.add(self._issue(
+                    message=(
+                        f"偵測到自動輪播（{c.selector}），觀察 {c.seconds_observed:.1f} 秒內 "
+                        f"DOM 自動變動，但未發現暫停／停止控制。請新增暫停按鈕，"
+                        f"且按鈕應為進入此區域的第一個焦點。"
+                    ),
+                    snippet=c.selector,
+                ))
+                return
+
+        # Static class-name hint — runs even without --render. Lower
+        # confidence ("info") because we can't confirm auto-rotation.
         for el in soup.find_all(True):
             if not isinstance(el, Tag) or should_skip(el):
                 continue
