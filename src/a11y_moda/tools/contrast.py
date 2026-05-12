@@ -218,9 +218,10 @@ def collect_text_samples_from_page(page) -> list[TextSample]:
     return samples
 
 
-def collect_text_samples(page_url: str, *, ua: str | None = None) -> list[TextSample]:
+def collect_text_samples(page_url: str, *, ua: str | None = None,
+                          color_scheme: str | None = None) -> list[TextSample]:
     """Standalone: open own browser, navigate, sample. Used when no shared session."""
     from ._session import standalone_page
-    with standalone_page(ua=ua) as page:
+    with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="networkidle", timeout=30000)
         return collect_text_samples_from_page(page)

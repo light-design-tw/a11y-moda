@@ -7,6 +7,70 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-05-12
+
+State-threading patch — fixes a class of bug where the standalone
+probe path silently dropped scan-level state on its way to probe
+pages. Same family as the v0.4.2 `getComputedStyle(target,
+':focus-visible')` fix: API used correctly at one layer, internal
+plumbing failed to propagate to the next.
+
+Specifically: `--dark-mode` set Playwright `color_scheme="dark"` only
+on the initial HTML fetch, not on the 5 probe pages that ran after.
+Each probe (`contrast`, `tab_walk`, `dialog`, `carousel`, `form`)
+opened its own chromium context via `standalone_page()` and the call
+sites in `scanner.py` did not pass `color_scheme` through. The
+shared-browser path (`_scan_page_with_browser`, used by the `site`
+command) was unaffected — it opens one context per URL and reuses
+that page across all probes.
+
+User impact: `a11y-moda scan <url> --dark-mode` returned only
+light-mode probe results. `--dark-mode` was effectively a no-op for
+the single-page command. The `site` command worked correctly.
+
+Diagnosis credit: the bug was identified by independent analysis from
+a teammate reviewing the v0.4.2 audit report against MODA's flagged
+contrast finding (`#c7cdd3` on `#868789`, ratio 2.24 — homepage
+Integration component, dark-only).
+
+### Fixed
+
+- **`tools/contrast.py` `collect_text_samples`** — now accepts
+  `color_scheme: str | None`, threads to `standalone_page()`.
+- **`tools/tab_walk.py` `walk_tab_stops`** — same.
+- **`tools/dialog_probe.py` `probe_dialogs`** — same.
+- **`tools/carousel_probe.py` `probe_carousels`** — same.
+- **`tools/form_probe.py` `probe_forms`** — same.
+- **`scanner.py` standalone path (lines 151-157)** — passes
+  `color_scheme=color_scheme` through to all 5 probe wrappers.
+
+### Verified
+
+`a11y-moda scan https://www.light-design.com.tw --render --dark-mode
+--level AAA` after the fix correctly emits `[深色模式]` `GN2140300E`
++ `GN3140600E` for the Integration component (`「整合您現有的系統與
+工具」` ratio=1.00, white-on-near-white) — the same element MODA's
+human auditor flagged. Pre-fix, both rules emitted nothing.
+
+### Notes
+
+- **Why `site --dark-mode` already worked** — the shared-browser path
+  uses `page_session(browser, color_scheme=color_scheme)` once per
+  URL, and all probes operate on that one already-configured page.
+  Standalone path was the regression because each probe opens its
+  own context.
+- **Probe wrapper signatures unchanged for callers that don't need
+  dark-mode** — `color_scheme` defaults to `None`, behavior identical
+  to pre-0.4.3 when omitted.
+- **Unrelated colleague findings (out of 0.4.3 scope)** — APG tabs
+  pattern (keyboard sim + roving tabindex) and carousel ←→ key
+  pause-on-focus are feature gaps, not bugs. Tracking for 0.5.x.
+  `HM1240404E` same-href context-difference detection requires LLM
+  judgment; current logic correctly skips when href matches.
+  `GN1240500E` caveat-vs-MODA-fail severity is a design choice.
+
+[0.4.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.3
+
 ## [0.4.2] — 2026-05-12
 
 Probe correctness patch — fixes a pseudo-class misuse in
@@ -737,7 +801,7 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.3...HEAD
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2

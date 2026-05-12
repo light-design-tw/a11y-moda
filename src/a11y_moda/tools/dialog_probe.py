@@ -374,11 +374,12 @@ def probe_dialogs_from_page(page, *, max_triggers: int = 4) -> list[DialogProbeR
 
 
 def probe_dialogs(page_url: str, *, ua: str | None = None,
-                  max_triggers: int = 4, timeout_ms: int = 30000
+                  max_triggers: int = 4, timeout_ms: int = 30000,
+                  color_scheme: str | None = None
                   ) -> list[DialogProbeResult]:
     """Standalone: open own browser, navigate, probe dialogs."""
     from ._session import standalone_page
-    with standalone_page(ua=ua) as page:
+    with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
         try:
             page.wait_for_load_state("networkidle", timeout=5000)

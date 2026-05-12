@@ -288,11 +288,12 @@ def probe_forms_from_page(page, original_url: str, *, max_forms: int = 5,
 
 
 def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
-                 ua: str | None = None, try_modal_triggers: bool = False
+                 ua: str | None = None, try_modal_triggers: bool = False,
+                 color_scheme: str | None = None
                  ) -> list[FormProbeResult]:
     """Standalone: open own browser, navigate, probe. Used when no shared session."""
     from ._session import standalone_page
-    with standalone_page(ua=ua) as page:
+    with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
         try:
             page.wait_for_load_state("networkidle", timeout=5000)

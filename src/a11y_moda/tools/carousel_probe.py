@@ -175,11 +175,12 @@ def probe_carousels_from_page(page, *, observe_seconds: float = 4.5,
 
 
 def probe_carousels(page_url: str, *, ua: str | None = None,
-                    observe_seconds: float = 4.5, timeout_ms: int = 30000
+                    observe_seconds: float = 4.5, timeout_ms: int = 30000,
+                    color_scheme: str | None = None
                     ) -> list[CarouselProbeResult]:
     """Standalone: open own browser, navigate, probe carousels."""
     from ._session import standalone_page
-    with standalone_page(ua=ua) as page:
+    with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
         try:
             page.wait_for_load_state("networkidle", timeout=5000)

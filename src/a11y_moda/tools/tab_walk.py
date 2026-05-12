@@ -77,9 +77,10 @@ def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
     return stops
 
 
-def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str | None = None) -> list[FocusStop]:
+def walk_tab_stops(page_url: str, *, max_stops: int = 80, ua: str | None = None,
+                    color_scheme: str | None = None) -> list[FocusStop]:
     """Standalone: open own browser. Used when no shared session."""
     from ._session import standalone_page
-    with standalone_page(ua=ua) as page:
+    with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="networkidle", timeout=30000)
         return walk_tab_stops_from_page(page, max_stops=max_stops)

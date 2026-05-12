@@ -148,11 +148,18 @@ def scan_page(
             from .tools.form_probe import probe_forms
             from .tools.dialog_probe import probe_dialogs
             from .tools.carousel_probe import probe_carousels
-            ctx.text_samples = collect_text_samples(url)
-            ctx.tab_stops = walk_tab_stops(url)
-            ctx.carousel_probes = probe_carousels(url)
-            ctx.dialog_probes = probe_dialogs(url)
-            ctx.form_sims = probe_forms(url, try_modal_triggers=probe_modals)
+            # Each probe opens its own chromium context — must thread
+            # color_scheme so --dark-mode actually reaches the probe pages
+            # (not just the initial fetch). Shared-browser path
+            # (`_scan_page_with_browser`) already handles this by passing
+            # color_scheme to page_session once; here we have 5 separate
+            # standalone_page() calls and each needs the explicit hop.
+            ctx.text_samples = collect_text_samples(url, color_scheme=color_scheme)
+            ctx.tab_stops = walk_tab_stops(url, color_scheme=color_scheme)
+            ctx.carousel_probes = probe_carousels(url, color_scheme=color_scheme)
+            ctx.dialog_probes = probe_dialogs(url, color_scheme=color_scheme)
+            ctx.form_sims = probe_forms(url, try_modal_triggers=probe_modals,
+                                         color_scheme=color_scheme)
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
