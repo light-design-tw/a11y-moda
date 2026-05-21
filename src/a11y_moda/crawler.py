@@ -92,6 +92,47 @@ async def _fetch_with_cap(cli: httpx.AsyncClient, url: str, *, max_bytes: int) -
         return None
 
 
+# MODA AAA 標章要求人類可讀的「網站導覽」(/sitemap HTML) 頁面，內含
+# accesskey 對應表 + Firefox 操作說明。這頁通常不會列在 sitemap.xml 裡
+# (sitemap.xml 是給 SEO 看的內容索引)，純 BFS 也可能因 max_pages 用完
+# 或 footer link 排序在後而抓不到。此處顯式 HEAD-probe 已知路徑，
+# 確保 MT309203 等 sitemap-page 規則對全自動 site scan 能生效。
+_SITEMAP_HTML_PATHS = ("/sitemap", "/Sitemap", "/sitemap.html", "/site-map")
+
+
+async def _probe_sitemap_html_candidates(base: str, *, timeout: float = 5.0) -> list[str]:
+    """HEAD-probe well-known human-readable sitemap page paths.
+
+    Returns URLs that respond with 2xx and (where content-type is reported)
+    look like HTML. Failures are silent — this is best-effort augmentation.
+    """
+    parsed = urlparse(base)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    found: list[str] = []
+    seen: set[str] = set()
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as cli:
+        for path in _SITEMAP_HTML_PATHS:
+            url = f"{root}{path}"
+            try:
+                r = await cli.head(url)
+            except Exception:
+                continue
+            if r.status_code >= 400:
+                continue
+            final = str(r.url)
+            if not is_safe_http_url(final):
+                continue
+            ct = r.headers.get("content-type", "").lower()
+            if ct and "html" not in ct:
+                continue
+            norm = _normalize(final)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            found.append(norm)
+    return found
+
+
 async def fetch_sitemap(base: str, *, timeout: float = 15.0) -> list[str]:
     """Try common sitemap locations; recurse into sitemap-index files."""
     parsed = urlparse(base)
@@ -280,13 +321,30 @@ def discover(
         return discover_filesystem(start_url, max_pages=max_pages,
                                     exclude_urls=exclude_urls,
                                     exclude_folders=exclude_folders)
+
+    excl_set = set(exclude_urls)
+
+    def _filter(urls: list[str]) -> list[str]:
+        out = [u for u in urls if _same_origin(start_url, u)]
+        return [u for u in out if not _is_excluded(u, exclude_urls=excl_set,
+                                                    exclude_folders=exclude_folders,
+                                                    skip_ext=skip_ext)]
+
+    # Human-readable sitemap pages (MODA AAA 必檢). Run alongside whichever
+    # discovery branch fires below — sitemap.xml typically omits these, and
+    # BFS may exhaust max_pages before reaching the footer link.
+    sitemap_html = _filter(asyncio.run(_probe_sitemap_html_candidates(start_url)))
+
     if prefer_sitemap:
-        urls = asyncio.run(fetch_sitemap(start_url))
-        urls = [u for u in urls if _same_origin(start_url, u)]
-        urls = [u for u in urls if not _is_excluded(u, exclude_urls=set(exclude_urls),
-                                                     exclude_folders=exclude_folders, skip_ext=skip_ext)]
+        urls = _filter(asyncio.run(fetch_sitemap(start_url)))
         if urls:
-            return urls[:max_pages]
-    return crawl(start_url, max_pages=max_pages, render=render,
-                 exclude_urls=exclude_urls, exclude_folders=exclude_folders,
-                 skip_ext=skip_ext, max_seconds=max_seconds)
+            seen = set(urls)
+            prepend = [u for u in sitemap_html if u not in seen]
+            return (prepend + urls)[:max_pages]
+
+    bfs = crawl(start_url, max_pages=max_pages, render=render,
+                exclude_urls=exclude_urls, exclude_folders=exclude_folders,
+                skip_ext=skip_ext, max_seconds=max_seconds)
+    seen = set(bfs)
+    extra = [u for u in sitemap_html if u not in seen]
+    return (extra + bfs)[:max_pages]

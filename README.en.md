@@ -117,13 +117,13 @@ CI integration:
 
 ## `rules` / `explain` — query MODA rule knowledge
 
-Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 131 rules are queryable.
+Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 133 rules are queryable.
 
 ```bash
-a11y-moda rules list                         # list all 131
+a11y-moda rules list                         # list all 133
 a11y-moda rules list --level AA              # filter by level
 a11y-moda rules list --topic forms           # filter by topic
-a11y-moda rules list --source extension      # freego (machine) / extension (E rules)
+a11y-moda rules list --source extension      # freego (machine) / extension (E rules) / moda-tw (localisation)
 a11y-moda rules list --scope lint            # scan / lint applicability
 
 a11y-moda rules search button                # English keyword (built-in alias map)
@@ -218,10 +218,12 @@ a11y-moda init <ide> --force      # overwrite existing file
 
 ## Coverage highlights
 
-- **131** registered rules covering Freego's machine-checked C rules + extension E rules (v0.4.0 added `GN1240300E` / `GN1410200E` ARIA tab-pattern rules)
+- **133** registered rules covering Freego's machine-checked C rules + extension E rules + MODA-Taiwan localisation rules (v0.4.4 added the `moda-tw` source tier with `H309204` accesskey + `MT309203` sitemap-page operation notes — common AAA-certification audit findings outside the WCAG E/C system)
 - **20 / 20** of MODA's AAA self-evaluation questions implemented (official tool: 0)
 - **70 %** of AAA self-eval rules run without any LLM/VLM call
-- **50** `lint`-eligible source-checkable rules (subset of 131)
+- **50** `lint`-eligible source-checkable rules (subset of 133)
+- `--freego-only` filters to just the official Freego machine checks (excludes both `extension` and `moda-tw` tiers)
+- `a11y-moda site` HEAD-probes `/sitemap` (and 3 variants) after `sitemap.xml` resolution, so the human-readable 網站導覽 page is reachable for the `MT309203` rule even when not listed in `sitemap.xml`
 - LLM endpoint can point to local models — request data stays on your network
 
 See the [中文 README](./README.md) for the full rule mechanism breakdown, command reference, and rule-authoring guide.

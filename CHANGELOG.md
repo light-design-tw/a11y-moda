@@ -7,6 +7,77 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-05-21
+
+Real-audit-driven gap closure (round 2). A recent MODA AAA review
+flagged accesskey shortcuts and sitemap-page operation notes under
+SC 2.4.5, but neither requirement traces to WCAG normative text —
+both belong to MODA's localised AAA conventions (legacy 90-code
+H-series + reviewer practice). a11y-moda's rule set is built from
+the modern E/C code system and never covered them, so the audit
+came back with findings the tool itself had reported as clean.
+
+This release introduces a new rule `source` tier `moda-tw` for
+MODA-Taiwan localisation checks that fall outside WCAG E/C, adds
+the first two rules in that tier, and patches the crawler so
+discovery actually reaches the human-readable sitemap page (the
+page these rules need to inspect).
+
+### Added
+- New rule source category `moda-tw` — for MODA-Taiwan localised
+  AAA requirements with no direct WCAG E/C counterpart. Always on
+  by default; suppressed under `--freego-only` (which is for
+  cross-checking against the official Freego tool, not for AAA
+  certification work).
+- **H309204** (Level AAA, `moda-tw`) — accesskey keyboard
+  shortcuts on common navigation links. Maps to MODA 110.07 legacy
+  check code H309204 ("對經常使用的超連結，增加快速鍵的操作");
+  WCAG equivalence is SC 2.4.1 Bypass Blocks. Detects:
+  - 0 accesskey on page → fail
+  - 1 accesskey → caveat (suggest at least 2 standard letters: U/C/N)
+  - ≥ 2 accesskey + orphan anchor (`<a accesskey href="#X">` with no
+    matching `id`/`name`) → caveat with orphan list
+  - ≥ 2 accesskey, all anchored → pass
+- **MT309203** (Level AAA, `moda-tw`) — sitemap page must document
+  accesskey shortcuts and Firefox-specific operation notes. Fires
+  only when the scanned URL is a sitemap page (detected via URL
+  path, `<title>`, or H1). The "MT" prefix marks this as an
+  a11y-moda localisation rule with no MODA-issued check code.
+
+### Changed
+- Crawler `discover()` now HEAD-probes well-known human-readable
+  sitemap page paths (`/sitemap`, `/Sitemap`, `/sitemap.html`,
+  `/site-map`) after `sitemap.xml` resolution and prepends any
+  hits to the discovery list. MODA AAA requires the 網站導覽 page,
+  which `sitemap.xml` typically does not list and BFS may miss
+  when `--max-pages` runs out. Cost: up to 4 HEAD requests per
+  `site` scan; non-HTML / 404 responses are silently dropped.
+- `--freego-only` (and its `--no-extension` alias) now also
+  excludes `moda-tw` rules. The flag is documented as "run only
+  rules covered by the official MODA tool's machine checks", and
+  localised AAA rules don't belong in that scope.
+- Total registered rule count: **133** (was 131). Two additions
+  are in the new `moda-tw` source tier.
+
+### Fixed
+- `H309204` accesskey detection correctly handles `bs4`'s
+  `AttributeValueList` return value for HTML multi-valued
+  attributes (`accesskey="U V"` is spec-legal even though uncommon
+  in practice).
+
+### Notes
+- Designed around a real MODA AAA finding pattern: reviewers
+  sometimes attach localisation requirements (accesskey, Firefox
+  notes) to WCAG SC findings (commonly SC 2.4.5) without making
+  the legacy H-code attribution explicit. a11y-moda now reports
+  these under their actual sources so the audit cycle and the
+  tool's findings line up.
+- AAA standard's `:::` 定位點 marker is intentionally not
+  enforced as a separate rule — without a paired `accesskey` or
+  anchor target the marker has no a11y value, and the accesskey
+  check above already covers the load-bearing half. Modern
+  `<nav>`/`<main>` ARIA landmarks satisfy the same intent.
+
 ## [0.4.3] — 2026-05-12
 
 State-threading patch — fixes a class of bug where the standalone
@@ -801,7 +872,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.4
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
 [0.3.2]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.2

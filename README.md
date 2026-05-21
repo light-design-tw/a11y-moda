@@ -117,13 +117,13 @@ CI 整合範例：
 
 ## `rules` / `explain` — 查 MODA 規則
 
-Knowledge service：把規則 metadata 暴露為 CLI API，給 AI agent 在**寫 code 之前**查 MODA 規範用。131 條規則全可查。
+Knowledge service：把規則 metadata 暴露為 CLI API，給 AI agent 在**寫 code 之前**查 MODA 規範用。133 條規則全可查。
 
 ```bash
-a11y-moda rules list                         # 列全部 131 條
+a11y-moda rules list                         # 列全部 133 條
 a11y-moda rules list --level AA              # 篩等級
 a11y-moda rules list --topic forms           # 篩主題
-a11y-moda rules list --source extension      # freego (機器) / extension (人工判斷)
+a11y-moda rules list --source extension      # freego (機器) / extension (人工判斷) / moda-tw (在地化)
 a11y-moda rules list --scope lint            # scan / lint (適用範圍)
 
 a11y-moda rules search button                # 英文 keyword (內建 alias 對照表)
@@ -238,7 +238,22 @@ a11y-moda init <ide> --force      # 覆蓋既有檔案
 
 </details>
 
-> 套件總註冊規則數：**131** (涵蓋 Freego 的 C 類機器檢查 + 我們補的 E 類擴充規則；v0.4.0 新增 `GN1240300E` / `GN1410200E` 兩條 ARIA 頁籤規則)。AAA 自評只是子集；`lint` 涵蓋其中 50 條 source-checkable 規則。
+> 套件總註冊規則數：**133** (涵蓋 Freego 的 C 類機器檢查 + 我們補的 E 類擴充規則 + MODA-Taiwan 在地化規則；v0.4.4 新增 `moda-tw` source 分類與 `H309204` / `MT309203` 兩條 AAA 標章常用稽核項)。AAA 自評只是子集；`lint` 涵蓋其中 50 條 source-checkable 規則。
+
+## MODA-Taiwan 在地化規則 (`source="moda-tw"`，since v0.4.4)
+
+MODA AAA 標章評核常引用的稽核項中，部分**不在 WCAG normative 文字裡**，也不在 MODA 公布的 E/C 主體系中 — 例如 accesskey 鍵盤快捷鍵 (Alt+U/C/N) 與「網站導覽」頁面的 Firefox 操作說明。這些屬於 MODA 110.07 規範的舊版 90 條檢測碼 (H 體系) + reviewer 在地稽核慣例，但拿著只實作 WCAG E/C 的工具去檢一定是 false negative，標章送件時會被打回。
+
+`moda-tw` source tier 補這個缺口。預設開啟，不需 flag。送件 AAA 標章時建議連這層一起跑。`--freego-only` 會排除這層 (該 flag 是用來對齊官方 Freego 工具輸出的)。
+
+| Rule ID | Level | 對應 WCAG | 檢什麼 |
+|---|---|---|---|
+| `H309204` | AAA | 2.4.1 (Bypass Blocks) | 頁面是否提供常用區塊 accesskey (典型 U=右上、C=中央、N=搜尋)；含孤兒 anchor 檢 (`<a accesskey href="#X">` 但無對應 `id`/`name`) |
+| `MT309203` | AAA | — (純 MODA 在地慣例) | 網站導覽 (sitemap) 頁面是否含 accesskey 對應表 + Firefox 操作說明 (`Shift+Alt+key`)。只在 URL / title / H1 偵測為 sitemap 頁時觸發 |
+
+**Rule ID 命名**：`H309204` 是 MODA 90 條檢測碼第 H309204 條 (有官方依據)。`MT309203` 開頭 `MT` 表示「MODA-Taiwan extension by a11y-moda」(無 MODA 公布編號，本工具為標章審查實務新增)。
+
+**crawler 配合 (since v0.4.4)**：`a11y-moda site` 現會在 sitemap.xml 探索後額外 HEAD-probe `/sitemap` `/Sitemap` `/sitemap.html` `/site-map` 四個常見 HTML 路徑並 prepend 進 URL 清單。sitemap.xml 通常不列「網站導覽」HTML 頁 (因屬 meta 而非內容)，加這個 probe 才能讓 `MT309203` 在全自動掃描下生效。
 
 ## 指令參考
 
@@ -264,7 +279,7 @@ a11y-moda init <ide>          安裝 IDE / agent 整合範本
 | `--workers N` | 4 | 並行 worker (僅靜態掃描；render 強制序列化) |
 | `--rps N` | 0 | 全域速率上限 (req/s)，0 = 不限 |
 | `--ignore RULE_ID` | — | 可重複；跳過指定 rule_id |
-| `--freego-only` | off | 只跑官方工具有的機器檢查規則 |
+| `--freego-only` | off | 只跑官方工具有的機器檢查規則 (排除 extension + moda-tw) |
 | `--freego-compat` | off | 對齊官方工具回報 (CS2140401C / CS3140801C / CS3140802C) |
 | `--allow-file` | off | 放行 `file://` 與本地路徑 (build output 用) |
 | `--probe-modals` | off | 模擬點擊偵測 modal / dialog |
@@ -336,6 +351,7 @@ class MyRule(Rule):
 
 `source = "freego"` → 對應官方工具有的機器檢查規則
 `source = "extension"` → E (人工判斷) 規則被我們程式化的版本
+`source = "moda-tw"` → MODA-Taiwan 在地化規則 — AAA 標章稽核常引用、但 WCAG E/C 主體系未收的項目 (例：H309204 accesskey 快捷鍵、MT309203 sitemap 操作說明)。`--freego-only` 會排除
 
 </details>
 
