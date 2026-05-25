@@ -224,6 +224,7 @@ a11y-moda init <ide> --force      # overwrite existing file
 - **50** `lint`-eligible source-checkable rules (subset of 133)
 - `--freego-only` filters to just the official Freego machine checks (excludes both `extension` and `moda-tw` tiers)
 - `a11y-moda site` HEAD-probes `/sitemap` (and 3 variants) after `sitemap.xml` resolution, so the human-readable 網站導覽 page is reachable for the `MT309203` rule even when not listed in `sitemap.xml`
+- **v0.4.5**: `MT309203` now cross-checks the sitemap page's accesskey description table against actual element `aria-label` / title / hidden text — text mismatches → `fail` with per-key diff listing
 - LLM endpoint can point to local models — request data stays on your network
 
 See the [中文 README](./README.md) for the full rule mechanism breakdown, command reference, and rule-authoring guide.

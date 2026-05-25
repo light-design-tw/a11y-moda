@@ -7,6 +7,32 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.5] — 2026-05-25
+
+MT309203 accesskey-label consistency check — catches the exact
+pattern MODA reviewers flag: the sitemap page's accesskey description
+table says one thing but the actual element `aria-label` / title /
+hidden text says something else. Screen reader users read the table
+first, then press the shortcut and hear different text — confusing.
+
+### Changed
+- **MT309203** now cross-checks the accesskey description table
+  against same-page `[accesskey]` elements' `aria-label` / `title` /
+  visible text. Mismatches → `fail` with per-key diff listing
+  (table description vs actual screen-reader announcement).
+  Previously MT309203 only verified the table and Firefox note
+  existed; text consistency was unchecked.
+
+### Notes
+- Driven by a real MODA AAA round-3 finding on light-design.com.tw:
+  reviewer flagged GN1240500E because `aria-label="開啟選單"` did not
+  match the sitemap table's `"開啟頁首主選單 (含各頁面連結)"`.
+- Cross-check is limited to the sitemap page itself (single-page
+  rule). Cross-page label-vs-table comparison (e.g. checking every
+  page's accesskey elements against the sitemap table) would require
+  architectural support for cross-page state passing — deferred.
+- Rule count unchanged at **133**.
+
 ## [0.4.4] — 2026-05-21
 
 Real-audit-driven gap closure (round 2). A recent MODA AAA review
@@ -872,7 +898,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.5
 [0.4.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.4
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4
 [0.3.3]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.3
