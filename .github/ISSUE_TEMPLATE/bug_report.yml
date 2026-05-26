@@ -1,0 +1,62 @@
+name: Bug Report
+description: 回報 a11y-moda 的問題
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感謝回報！請盡量提供重現步驟，方便我們定位問題。
+  - type: input
+    id: version
+    attributes:
+      label: a11y-moda 版本
+      description: "執行 `a11y-moda --version` 取得"
+      placeholder: "0.4.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: command
+    attributes:
+      label: 使用的指令
+      options:
+        - lint
+        - scan
+        - site
+        - rules / explain
+        - init
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 問題描述
+      description: 發生了什麼？預期應該是什麼？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟
+      description: 完整的指令和輸出
+      render: bash
+      placeholder: |
+        a11y-moda scan https://example.com --level AA --render
+        # 貼上輸出或錯誤訊息
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: 作業系統
+      placeholder: "Windows 11 / macOS 15 / Ubuntu 24.04"
+    validations:
+      required: false
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      placeholder: "3.12"
+    validations:
+      required: false

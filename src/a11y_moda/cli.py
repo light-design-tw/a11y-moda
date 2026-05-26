@@ -154,7 +154,7 @@ def _serialize_scan(scan: ScanReport) -> dict:
                    "process env vars are never overridden.")
 @click.pass_context
 def main(ctx: click.Context, env_file: str | None) -> None:
-    """Taiwan MODA accessibility CLI — WCAG A/AA/AAA · zh-TW · 129 rules.
+    """Taiwan MODA accessibility CLI — WCAG A/AA/AAA · zh-TW · 133 rules.
 
     \b
     AUDIT (find a11y violations in your code or pages)
@@ -718,7 +718,7 @@ def rules() -> None:
 def rules_list(level: str | None, topic: str | None, source: str | None,
                scope: str | None, search: str | None,
                fmt: str, output: str | None) -> None:
-    """List rules matching filters. Default: all 129 rules in compact table."""
+    """List rules matching filters. Default: all 133 rules in compact table."""
     rs = _filter_rules(_all_rules_metadata(), level=level, topic=topic,
                        source=source, scope=scope, search=search)
     if fmt == "json":

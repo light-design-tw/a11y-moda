@@ -1,0 +1,33 @@
+name: Feature Request
+description: 建議新功能或改進
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 想要什麼功能？
+      description: 清楚描述你希望 a11y-moda 能做什麼
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: 使用情境
+      description: 什麼場景下需要這個功能？
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: 相關模組
+      options:
+        - lint (原始碼掃描)
+        - scan / site (渲染 DOM 掃描)
+        - rules / explain (規則查詢)
+        - init (IDE 整合)
+        - 新規則
+        - 報告格式
+        - 其他
+    validations:
+      required: false
