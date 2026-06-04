@@ -15,6 +15,7 @@ import httpx
 
 from .models import PageReport
 from ._security import require_safe_http_url, UnsafeURLError
+from ._ssl import httpx_verify
 
 
 from . import USER_AGENT as _DEFAULT_UA
@@ -66,7 +67,7 @@ def _read_local_file(url: str) -> tuple[int, str, str]:
         return 0, "", f"{type(e).__name__}: {e}"
 
 
-def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> tuple[PageReport, BeautifulSoup | None, str]:
+def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA, legacy_tls: bool = False) -> tuple[PageReport, BeautifulSoup | None, str]:
     report = PageReport(url=url)
     try:
         require_safe_http_url(url)
@@ -82,7 +83,8 @@ def fetch_static(url: str, *, timeout: float = 30.0, ua: str = _DEFAULT_UA) -> t
         soup = BeautifulSoup(html, "lxml")
         return report, soup, html
     try:
-        with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua}) as cli:
+        with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua},
+                          verify=httpx_verify(legacy_tls)) as cli:
             r = cli.get(url)
         # Re-validate after redirects — server may bounce us at internal hosts.
         try:
@@ -162,12 +164,17 @@ def fetch_rendered(url: str, *, timeout_ms: int = 30000, ua: str = _DEFAULT_UA,
 
 
 def fetch(url: str, *, render: bool = False, timeout: float = 30.0, ua: str = _DEFAULT_UA,
-          capture_screenshot: bool = False, color_scheme: str | None = None
+          capture_screenshot: bool = False, color_scheme: str | None = None,
+          legacy_tls: bool = False,
           ) -> tuple[PageReport, BeautifulSoup | None, str, bytes | None, bytes | None]:
-    """Returns (report, soup, html, full_png, viewport_png). PNGs only when render+capture."""
+    """Returns (report, soup, html, full_png, viewport_png). PNGs only when render+capture.
+
+    legacy_tls only applies to the static (httpx) path. The rendered path
+    delegates TLS to Chromium, which has its own handshake stack.
+    """
     if render:
         return fetch_rendered(url, timeout_ms=int(timeout * 1000), ua=ua,
                               capture_screenshot=capture_screenshot,
                               color_scheme=color_scheme)
-    report, soup, html = fetch_static(url, timeout=timeout, ua=ua)
+    report, soup, html = fetch_static(url, timeout=timeout, ua=ua, legacy_tls=legacy_tls)
     return report, soup, html, None, None

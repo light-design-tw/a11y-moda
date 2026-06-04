@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup
 
 from . import USER_AGENT
 from ._security import is_safe_http_url
+from ._ssl import httpx_verify
 
 
 _SITEMAP_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -100,7 +101,7 @@ async def _fetch_with_cap(cli: httpx.AsyncClient, url: str, *, max_bytes: int) -
 _SITEMAP_HTML_PATHS = ("/sitemap", "/Sitemap", "/sitemap.html", "/site-map")
 
 
-async def _probe_sitemap_html_candidates(base: str, *, timeout: float = 5.0) -> list[str]:
+async def _probe_sitemap_html_candidates(base: str, *, timeout: float = 5.0, legacy_tls: bool = False) -> list[str]:
     """HEAD-probe well-known human-readable sitemap page paths.
 
     Returns URLs that respond with 2xx and (where content-type is reported)
@@ -110,7 +111,7 @@ async def _probe_sitemap_html_candidates(base: str, *, timeout: float = 5.0) -> 
     root = f"{parsed.scheme}://{parsed.netloc}"
     found: list[str] = []
     seen: set[str] = set()
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as cli:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, verify=httpx_verify(legacy_tls)) as cli:
         for path in _SITEMAP_HTML_PATHS:
             url = f"{root}{path}"
             try:
@@ -133,13 +134,13 @@ async def _probe_sitemap_html_candidates(base: str, *, timeout: float = 5.0) -> 
     return found
 
 
-async def fetch_sitemap(base: str, *, timeout: float = 15.0) -> list[str]:
+async def fetch_sitemap(base: str, *, timeout: float = 15.0, legacy_tls: bool = False) -> list[str]:
     """Try common sitemap locations; recurse into sitemap-index files."""
     parsed = urlparse(base)
     root = f"{parsed.scheme}://{parsed.netloc}"
     candidates = [f"{root}/sitemap.xml", f"{root}/sitemap_index.xml", f"{root}/sitemap.xml.gz"]
     urls: list[str] = []
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout) as cli:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, verify=httpx_verify(legacy_tls)) as cli:
         for c in candidates:
             text = await _fetch_with_cap(cli, c, max_bytes=_SITEMAP_MAX_BYTES)
             if not text or not text.strip().startswith("<"):
@@ -204,6 +205,7 @@ def crawl(
     exclude_folders: tuple[str, ...] = (),
     skip_ext: tuple[str, ...] = DEFAULT_SKIP_EXT,
     max_seconds: float = 0,
+    legacy_tls: bool = False,
 ) -> list[str]:
     """BFS same-origin crawl. render=True → Playwright (catches JS-injected links)."""
     queue: deque[str] = deque([_normalize(start_url)])
@@ -238,7 +240,8 @@ def crawl(
             browser.close()
         return found
 
-    with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua}) as cli:
+    with httpx.Client(follow_redirects=True, timeout=timeout, headers={"User-Agent": ua},
+                      verify=httpx_verify(legacy_tls)) as cli:
         while queue and len(found) < max_pages:
             if max_seconds and time.monotonic() - started > max_seconds:
                 break
@@ -311,6 +314,7 @@ def discover(
     exclude_folders: tuple[str, ...] = (),
     skip_ext: tuple[str, ...] = DEFAULT_SKIP_EXT,
     max_seconds: float = 0,
+    legacy_tls: bool = False,
 ) -> list[str]:
     """Sitemap-first, fall back to crawl. render only affects crawl path.
 
@@ -333,10 +337,10 @@ def discover(
     # Human-readable sitemap pages (MODA AAA 必檢). Run alongside whichever
     # discovery branch fires below — sitemap.xml typically omits these, and
     # BFS may exhaust max_pages before reaching the footer link.
-    sitemap_html = _filter(asyncio.run(_probe_sitemap_html_candidates(start_url)))
+    sitemap_html = _filter(asyncio.run(_probe_sitemap_html_candidates(start_url, legacy_tls=legacy_tls)))
 
     if prefer_sitemap:
-        urls = _filter(asyncio.run(fetch_sitemap(start_url)))
+        urls = _filter(asyncio.run(fetch_sitemap(start_url, legacy_tls=legacy_tls)))
         if urls:
             seen = set(urls)
             prepend = [u for u in sitemap_html if u not in seen]
@@ -344,7 +348,7 @@ def discover(
 
     bfs = crawl(start_url, max_pages=max_pages, render=render,
                 exclude_urls=exclude_urls, exclude_folders=exclude_folders,
-                skip_ext=skip_ext, max_seconds=max_seconds)
+                skip_ext=skip_ext, max_seconds=max_seconds, legacy_tls=legacy_tls)
     seen = set(bfs)
     extra = [u for u in sitemap_html if u not in seen]
     return (extra + bfs)[:max_pages]

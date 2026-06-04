@@ -165,6 +165,12 @@ a11y-moda site ./dist --allow-file --render --level AA --format html -o dist-aud
 
 **`--dark-mode` (since v0.4.0；v0.4.1 改為自動雙跑)** — 自動跑 **light + dark 兩次**並合併結果。深色主題下才出現的 issue 會在 message 加上 `[深色模式]` 前綴標示。設計系統的對比度 bug 多半藏在深色變體，預設 light 掃描看不到。需搭配 `--render`。
 
+**`--legacy-tls` (since v0.4.6)** — 部分 gov.tw / 企業舊系統還在用 TLS 1.0 + 弱 cipher，Python 3.12+ 預設嚴格握手會炸 `SSLV3_ALERT_HANDSHAKE_FAILURE` 或 `UNSAFE_LEGACY_RENEGOTIATION_DISABLED`。加 `--legacy-tls` 改用 relaxed `SSLContext`（TLS 1.0 floor、SECLEVEL=1、unsafe renegotiation 允許），憑證仍驗證。預設關閉。
+
+```bash
+a11y-moda scan https://舊系統.gov.tw --legacy-tls --level AA
+```
+
 **新增的 runtime probe (since v0.4.0)** — `--render` 模式下自動跑：
 - **焦點陷阱偵測** (`tools/dialog_probe.py`) — 自動找 hamburger / dialog trigger，按 Tab N 次驗證焦點是否被 trap 在開啟容器內。MODA 對 1.4.1 / 2.4.3 / 2.4.7 的人工審查最常打回的點。
 - **跳到主要內容偵測** — 自動找 skip link、按 Enter，驗證跳轉目標元素有可見焦點指示。

@@ -32,6 +32,7 @@ covered by SKILL.md §1-§8 directly.
 | `discovered 0 URL(s)` (site mode) | sitemap.xml missing AND BFS found nothing | Try `--source crawl --render-crawl` (JS-injected links); if still empty, fall back to user-provided URL list |
 | HTTP 403 / 429 in `fetch_error` | Rate-limited or bot-blocked | Add `--rps 1 --delay 1` and retry; if persists, target may need authenticated scan (not supported) |
 | HTTP 5xx in `fetch_error` | Target server error | Not our problem; report to user, don't auto-retry |
+| `SSLV3_ALERT_HANDSHAKE_FAILURE` or `UNSAFE_LEGACY_RENEGOTIATION_DISABLED` | Target uses legacy TLS (1.0 / weak ciphers); Python 3.12+ rejects by default | Add `--legacy-tls` and retry. Common on older gov.tw / enterprise infra |
 | `caveat: LLM unavailable` | No LLM env vars (default) | NOT an error. Filter from main report (SKILL §7). Don't suggest setup unless user asks |
 | `caveat: LLM error: <msg>` | LLM endpoint configured but returned error | Mention to user once: "LLM at `<base_url>` returned `<msg>`; affected N rules fell back to caveat" |
 | Skill fails to find `a11y-moda` binary | Not installed / not on PATH | Tell user: `pip install a11y-moda` (mention venv if they're in one) |

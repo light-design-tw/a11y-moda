@@ -339,6 +339,11 @@ def _lint_to_markdown(report) -> str:
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
                    "site author cannot fix external resources directly (WCAG 2.1 §5.4 "
                    "Partial Conformance route applies).")
+@click.option("--legacy-tls", is_flag=True, default=False,
+              help="Relax TLS for legacy infra (TLS 1.0+, weak ciphers, unsafe renegotiation). "
+                   "Some older gov.tw / enterprise sites fail Python 3.12+ strict handshake "
+                   "with SSLV3_ALERT_HANDSHAKE_FAILURE or UNSAFE_LEGACY_RENEGOTIATION_DISABLED. "
+                   "Certs still verified — only handshake parameters relaxed.")
 @_llm_options
 @click.option("--format", "fmt", type=click.Choice(["json", "md", "html"]), default="json")
 @click.option("--output", "-o", type=click.Path(), default=None,
@@ -348,6 +353,7 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
          fail_only: bool, allow_private_hosts: bool, allow_file: bool,
          probe_modals: bool, dark_mode: bool,
          strict_third_party: bool,
+         legacy_tls: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          fmt: str, output: str | None) -> None:
@@ -366,7 +372,8 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
         return scan_page(url, level=Level[level], render=render,
                          freego_compat=freego_compat, ignore=ignore, sources=sources, llm=llm,
                          llm_workers=llm_concurrency, probe_modals=probe_modals,
-                         strict_third_party=strict_third_party, color_scheme=scheme)
+                         strict_third_party=strict_third_party, color_scheme=scheme,
+                         legacy_tls=legacy_tls)
 
     if dark_mode and render:
         # Two passes — light first, dark second. Merged at PageReport level.
@@ -436,6 +443,11 @@ def scan(url: str, level: str, render: bool, freego_compat: bool,
                    "Default: downgrade to caveat with [third-party: <origin>] prefix, since "
                    "site author cannot fix external resources directly (WCAG 2.1 §5.4 "
                    "Partial Conformance route applies).")
+@click.option("--legacy-tls", is_flag=True, default=False,
+              help="Relax TLS for legacy infra (TLS 1.0+, weak ciphers, unsafe renegotiation). "
+                   "Some older gov.tw / enterprise sites fail Python 3.12+ strict handshake "
+                   "with SSLV3_ALERT_HANDSHAKE_FAILURE or UNSAFE_LEGACY_RENEGOTIATION_DISABLED. "
+                   "Certs still verified — only handshake parameters relaxed.")
 @_llm_options
 @click.option("--group-by", type=click.Choice(["rule", "wcag", "url"]), default="rule",
               help="MD/JSON grouping (rule = most actionable; HTML always shows all 3 tabs)")
@@ -450,6 +462,7 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
          max_time: float, allow_private_hosts: bool, allow_file: bool,
          probe_modals: bool, dark_mode: bool,
          strict_third_party: bool,
+         legacy_tls: bool,
          llm_base_url: str | None, llm_key: str | None, llm_model: str | None,
          llm_concurrency: int,
          group_by: str, fmt: str, output: str | None) -> None:
@@ -473,15 +486,16 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
     elif source == "sitemap":
         from .crawler import fetch_sitemap
         import asyncio
-        urls = asyncio.run(fetch_sitemap(start_url))[:max_pages]
+        urls = asyncio.run(fetch_sitemap(start_url, legacy_tls=legacy_tls))[:max_pages]
     elif source == "crawl":
         urls = crawl(start_url, max_pages=max_pages, render=render_crawl,
                      exclude_urls=exclude_url, exclude_folders=exclude_folder,
-                     max_seconds=max_time)
+                     max_seconds=max_time, legacy_tls=legacy_tls)
     else:
         urls = discover(start_url, max_pages=max_pages, prefer_sitemap=True,
                         render=render_crawl, exclude_urls=exclude_url,
-                        exclude_folders=exclude_folder, max_seconds=max_time)
+                        exclude_folders=exclude_folder, max_seconds=max_time,
+                        legacy_tls=legacy_tls)
     if not urls:
         urls = [start_url]
     print(f"discovered {len(urls)} URL(s)", file=sys.stderr)
@@ -495,7 +509,8 @@ def site(start_url: str, level: str, render: bool, freego_compat: bool,
                          sources=sources, llm=llm, llm_workers=llm_concurrency,
                          probe_modals=probe_modals,
                          strict_third_party=strict_third_party,
-                         color_scheme=scheme)
+                         color_scheme=scheme,
+                         legacy_tls=legacy_tls)
 
     if dark_mode and render:
         from .scanner import merge_dark_into_report

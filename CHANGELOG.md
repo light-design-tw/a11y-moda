@@ -7,6 +7,37 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.6] — 2026-06-04
+
+`--legacy-tls` flag for legacy gov.tw / enterprise infra that fails
+Python 3.12+ strict TLS handshake. Reported by a Python 3.13 user
+scanning a gov.tw site — `httpx.ConnectError: SSLV3_ALERT_HANDSHAKE_FAILURE`
+on a server still negotiating TLS 1.0 + SECLEVEL 1 ciphers.
+
+### Added
+- `--legacy-tls` flag on `scan` and `site`. Switches httpx
+  client to a relaxed `SSLContext` (TLS 1.0 floor, SECLEVEL=1,
+  `OP_LEGACY_SERVER_CONNECT`). Cert verification stays on —
+  only handshake parameters relaxed.
+- Internal `a11y_moda._ssl` module: `legacy_ssl_context()` factory
+  and `httpx_verify(legacy_tls)` helper used by `fetcher.py`,
+  `crawler.py`, and `css_utils.py` (external stylesheet fetch).
+- `css_utils.set_legacy_tls(bool)` — module-level toggle so the
+  20+ rules that pull stylesheets via `collect_declarations()` /
+  `_fetch()` honour `--legacy-tls` without threading the flag
+  through every rule's signature. Scanner sets it once per scan.
+- REFERENCE.md §2 error → action table row for
+  `SSLV3_ALERT_HANDSHAKE_FAILURE` / `UNSAFE_LEGACY_RENEGOTIATION_DISABLED`.
+
+### Notes
+- Render path (Playwright/Chromium) handles TLS independently;
+  flag is meaningful only for the static httpx path (default fetch +
+  sitemap.xml + BFS crawl).
+- Off by default — relaxing TLS is a security trade-off and must be
+  the user's explicit choice. The error message in REFERENCE
+  surfaces the flag when a real handshake failure occurs.
+- Rule count unchanged at **133**.
+
 ## [0.4.5] — 2026-05-25
 
 MT309203 accesskey-label consistency check — catches the exact
@@ -898,7 +929,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.6...HEAD
+[0.4.6]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.6
 [0.4.5]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.5
 [0.4.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.4
 [0.3.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.3.4

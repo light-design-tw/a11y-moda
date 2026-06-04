@@ -13,6 +13,27 @@ import tinycss2
 from bs4 import BeautifulSoup, Tag
 
 from ._security import is_safe_http_url
+from ._ssl import httpx_verify
+
+
+# Per-process flag — set by scanner before fetching any stylesheets. Threaded
+# scans share the same value (CLI is single --legacy-tls toggle), so a module
+# global is safe here. Threading `legacy_tls` through every rule that calls
+# collect_declarations() / _fetch() would require touching 20+ rule files;
+# this avoids that churn while still honouring the flag.
+_LEGACY_TLS = False
+
+
+def set_legacy_tls(enabled: bool) -> None:
+    """Toggle relaxed TLS for subsequent _fetch() calls. Called by scanner.
+
+    Note: invalidates the @lru_cache when the flag flips — same URL fetched
+    under different TLS modes would otherwise return stale content.
+    """
+    global _LEGACY_TLS
+    if _LEGACY_TLS != enabled:
+        _fetch.cache_clear()
+        _LEGACY_TLS = enabled
 
 
 @dataclass
@@ -33,7 +54,7 @@ def _fetch(url: str) -> str:
     if not is_safe_http_url(url):
         return ""
     try:
-        with httpx.Client(follow_redirects=True, timeout=10.0) as cli:
+        with httpx.Client(follow_redirects=True, timeout=10.0, verify=httpx_verify(_LEGACY_TLS)) as cli:
             with cli.stream("GET", url) as r:
                 if r.status_code != 200 or not is_safe_http_url(str(r.url)):
                     return ""

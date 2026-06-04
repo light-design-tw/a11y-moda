@@ -10,6 +10,7 @@ from .fetcher import fetch, fetch_with_page
 from .models import Issue, Level, PageReport, ScanReport
 from .rules import all_rules
 from .rules.base import RuleContext
+from .css_utils import set_legacy_tls as _css_set_legacy_tls
 
 
 _DARK_PREFIX = "[深色模式] "
@@ -109,6 +110,7 @@ def scan_page(
     probe_modals: bool = False,
     strict_third_party: bool = False,
     color_scheme: str | None = None,
+    legacy_tls: bool = False,
 ) -> PageReport:
     """Scan one URL.
 
@@ -120,6 +122,7 @@ def scan_page(
     llm_workers controls per-page LLM rule concurrency (1 = serial; default).
     Set higher when the LLM endpoint can serve concurrent requests.
     """
+    _css_set_legacy_tls(legacy_tls)
     capture_shots = bool(llm and render and llm.supports_vision())
     if render and browser is not None:
         return _scan_page_with_browser(url, browser=browser, level=level,
@@ -130,7 +133,7 @@ def scan_page(
                                         color_scheme=color_scheme)
     # Standalone path — used for static scans and single-URL render scans.
     report, soup, html, full_png, vp_png = fetch(url, render=render, capture_screenshot=capture_shots,
-                                                  color_scheme=color_scheme)
+                                                  color_scheme=color_scheme, legacy_tls=legacy_tls)
     if soup is None:
         return report
     ctx = RuleContext(freego_compat=freego_compat, ignore=set(ignore), llm=llm,
@@ -229,6 +232,7 @@ def scan_urls(
     probe_modals: bool = False,
     strict_third_party: bool = False,
     color_scheme: str | None = None,
+    legacy_tls: bool = False,
 ) -> ScanReport:
     """Parallel scan of many URLs.
 
@@ -236,6 +240,7 @@ def scan_urls(
     rps  : global cap on requests-per-second across all workers (0 = no limit).
     Browser scans serialised (Playwright is heavy).
     """
+    _css_set_legacy_tls(legacy_tls)
     out = ScanReport()
     limiter = _RateLimiter(rps) if rps > 0 else None
 
@@ -249,7 +254,8 @@ def scan_urls(
                          llm=llm, browser=browser, llm_workers=llm_workers,
                          probe_modals=probe_modals,
                          strict_third_party=strict_third_party,
-                         color_scheme=color_scheme)
+                         color_scheme=color_scheme,
+                         legacy_tls=legacy_tls)
 
     if render:
         # Serial when rendering. Share one chromium across the whole site;
