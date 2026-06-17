@@ -7,6 +7,23 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.4.7] — 2026-06-18
+
+防禦性安全強化。無使用者可見介面變動（無新 flag / command），輸出 schema 不變。
+
+### Security
+- `--render` 掃描的 standalone probe（contrast / tab walk / carousel /
+  dialog / form）在頁面導航後重新驗證最終 URL（`require_safe_http_url`），
+  使重導向至內部主機的情況被擋下（SSRF 防禦，與 `fetch_with_page` 一致）。
+- Markdown 報表對不可信的頁面 URL 與 issue 訊息做轉義（`_md_inline` /
+  `_md_code`），避免被掃描站注入連結、圖片、強調語法或表格破壞
+  （HTML 報表本已轉義）。
+- `dialog_probe` 將頁面衍生的 container selector 以 `page.evaluate` 參數
+  傳入，取代 f-string 內插，封閉 JS 注入面。
+
+### Notes
+- 純內部硬化，CLI 介面與輸出 schema 不變；README 無對應功能區段。
+
 ## [0.4.6] — 2026-06-04
 
 `--legacy-tls` flag for legacy gov.tw / enterprise infra that fails
@@ -929,7 +946,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.6...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.7...HEAD
+[0.4.7]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.7
 [0.4.6]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.6
 [0.4.5]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.5
 [0.4.4]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.4
