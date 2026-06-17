@@ -181,6 +181,8 @@
 | **FA1130114E** | 1.3.1 | 🟢 DOM | ✅ 新增 `tables/FA1130114E.py` — role=presentation/none 排版表格仍帶 th/caption/非空 summary → fail（與 HM1130107E 互補）|
 | **HM2330800E** | 3.3.8 | 🟢 DOM | ✅ 新增 `forms/HM2330800E.py` — type=email/password 缺 autocomplete（未設/off）→ fail；與 HM2130500E（1.3.5 token 合法性）互補 |
 | **FA2330801E** | 3.3.8/3.3.9 | 🟢 DOM | ✅ 新增 `forms/FA2330801E.py` — password/text 等以 inline onpaste 阻擋貼上 → fail（僅 inline handler）|
+| **FA1130204E** | 1.3.2 | 🔵 LLM | ✅ 新增 `tables/FA1130204E.py` — 排版表格（無 th、多欄、含區塊內容）線性化後序列是否有意義，LLM 判；無 LLM no-op |
+| GN1320600E | 3.2.6 | 🔵 **暫緩** | 一致協助 — 核心是「跨頁一致位置」，單頁規則無跨頁狀態；per-page「有無 contact」近噪音 → 待站級架構 |
 
 > tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道）。reflow 則新增 `RuleContext.reflow` 欄位 — 屬真 state threading，已於 scanner 兩路徑（standalone L162 / shared L205）各自 populate 並用 localhost 固定寬頁 end-to-end 驗證兩路徑都觸發。
 
