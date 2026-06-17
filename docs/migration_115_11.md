@@ -157,6 +157,10 @@
 | **CS2250800E** | 2.5.8 | 🟡 Browser | ✅ 新增 `responsive/CS2250800E.py` — 復用 `tab_stops.bbox`（不需新 probe）；寬與高皆 < 24px 才 fail（避免行內文字連結誤判）|
 | **GN2141009E** | 1.4.10 | 🟡 Browser | ✅ 新增 `tools/reflow_probe.py` + `responsive/GN2141009E.py` — **新 probe**：viewport 縮 320px 量 scrollWidth>clientWidth → 水平捲動 fail。新增 `RuleContext.reflow` 欄位，**scanner 兩路徑都接** |
 | FA2250700E | 2.5.7 | 🟡 **暫緩** | 拖曳替代 — 偵測 drag handler + 判斷單指替代訊號太弱、FP 高，暫緩 |
+| **FA1220102E** | 2.2.1 | 🟢 DOM | ✅ 新增 `meta/FA1220102E.py` — `<meta http-equiv=refresh>` 計時(delay>0)轉向/重整 → fail；instant(0) 不誤判 |
+| **FA1210102E** | 2.1.1 | 🟢 DOM | ✅ 新增 `keyboard/FA1210102E.py` — 僅綁指標啟動事件(onmousedown/up、pointer、touch、dblclick)且無 onclick/鍵盤 → fail。排除 hover 降 FP；僅 inline handler |
+| FA1210401E | 2.1.4 | 🔵 **暫緩** | 字元快捷鍵能否關閉/重對應 = 純 JS，靜態 DOM 偵測不到 |
+| FA2240701E | 2.4.7 | 🟡 **暫緩** | outline 移除 — runtime CS2240700E 已涵蓋（且更準），靜態版易誤判且重複 |
 
 > tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道）。reflow 則新增 `RuleContext.reflow` 欄位 — 屬真 state threading，已於 scanner 兩路徑（standalone L162 / shared L205）各自 populate 並用 localhost 固定寬頁 end-to-end 驗證兩路徑都觸發。
 
