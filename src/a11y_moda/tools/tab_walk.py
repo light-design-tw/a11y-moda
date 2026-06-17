@@ -1,5 +1,6 @@
-"""Keyboard tab traversal via Playwright. Reports focusable element order +
-visible focus ring presence.
+"""Keyboard tab traversal via Playwright. Reports focusable element order,
+visible focus ring presence + geometry, and whether the focused element is
+obscured by sticky/fixed content (WCAG 2.4.11 / 2.4.13 evidence).
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -13,6 +14,16 @@ class FocusStop:
     text: str
     has_visible_outline: bool
     in_viewport: bool
+    # Focus-indicator geometry (2.4.13). outline_width is px; 0 when the
+    # indicator is box-shadow-only or absent — measure-by-outline not possible.
+    outline_width: float = 0.0
+    outline_color: str = ""
+    bbox: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)  # x, y, w, h (viewport coords)
+    # focused element covered by a position:sticky / fixed element. `obscured`
+    # = any sample point covered (2.4.12 enhanced); `obscured_fully` = every
+    # in-viewport sample point covered, i.e. entirely hidden (2.4.11 minimum).
+    obscured: bool = False
+    obscured_fully: bool = False
 
 
 COLLECT_FOCUS_JS = r"""
@@ -33,6 +44,34 @@ COLLECT_FOCUS_JS = r"""
     const focusBoxShadow = cs.boxShadow && cs.boxShadow !== 'none';
     const rect = el.getBoundingClientRect();
     const inViewport = rect.top >= 0 && rect.bottom <= window.innerHeight && rect.width > 0;
+    // 2.4.11: probe a few points on the focused element's box; if the topmost
+    // element there is a different element nested under a sticky/fixed
+    // ancestor, the focus is being covered (browsers scroll focus into view
+    // but ignore sticky overlays).
+    let obscuredCount = 0, sampledCount = 0;
+    if (rect.width > 0 && rect.height > 0) {
+        const pts = [
+            [rect.left + rect.width / 2, rect.top + 2],
+            [rect.left + 2, rect.top + 2],
+            [rect.right - 2, rect.top + 2],
+            [rect.left + rect.width / 2, rect.bottom - 2],
+        ];
+        for (const [x, y] of pts) {
+            if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
+            sampledCount++;
+            const top = document.elementFromPoint(x, y);
+            if (!top || top === el || el.contains(top) || top.contains(el)) continue;
+            let p = top, hit = false;
+            while (p && p !== document.body) {
+                const pos = getComputedStyle(p).position;
+                if (pos === 'sticky' || pos === 'fixed') { hit = true; break; }
+                p = p.parentElement;
+            }
+            if (hit) obscuredCount++;
+        }
+    }
+    const obscured = obscuredCount > 0;
+    const obscuredFully = sampledCount > 0 && obscuredCount === sampledCount;
     let selector = el.tagName.toLowerCase();
     if (el.id) selector += '#' + el.id;
     else if (el.className && typeof el.className === 'string') {
@@ -44,6 +83,11 @@ COLLECT_FOCUS_JS = r"""
         text: (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().slice(0, 60),
         hasVisibleOutline: focusOutline || focusBoxShadow,
         inViewport,
+        outlineWidth: focusOutline ? (parseFloat(cs.outlineWidth) || 0) : 0,
+        outlineColor: cs.outlineColor,
+        bbox: [rect.left, rect.top, rect.width, rect.height],
+        obscured,
+        obscuredFully,
     };
 }
 """
@@ -66,6 +110,7 @@ def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
         if key in seen:
             break
         seen.add(key)
+        bbox = info.get("bbox") or (0, 0, 0, 0)
         stops.append(FocusStop(
             index=i,
             tag=info["tag"],
@@ -73,6 +118,11 @@ def walk_tab_stops_from_page(page, *, max_stops: int = 80) -> list[FocusStop]:
             text=info["text"],
             has_visible_outline=bool(info["hasVisibleOutline"]),
             in_viewport=bool(info["inViewport"]),
+            outline_width=float(info.get("outlineWidth") or 0),
+            outline_color=str(info.get("outlineColor") or ""),
+            bbox=(float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])),
+            obscured=bool(info.get("obscured")),
+            obscured_fully=bool(info.get("obscuredFully")),
         ))
     return stops
 
