@@ -1,4 +1,4 @@
-"""HM3330500C rule."""
+"""GN3330502E rule (was HM3330500C under 110.07; renamed for 115.11)."""
 from __future__ import annotations
 from bs4 import BeautifulSoup, Tag
 from ....models import Level, PageReport
@@ -8,13 +8,14 @@ from ...helpers import should_skip, truncate
 
 @register
 class TitleHintForContext(Rule):
-    """HM3330500C — derived: passes if HM3240900C and HM1130104C both pass."""
+    """GN3330502E — derived: passes if HM3240900C and HM1130104C both pass."""
 
     meta = RuleMeta(
-        rule_id="HM3330500C",
+        rule_id="GN3330502E",
         guideline="3.3.5",
         level=Level.AAA,
-        desc="使用標題(title)屬性來提供針對脈絡而作的協助說明",
+        desc="利用標題(title)屬性來提供針對脈絡而作的協助說明",
+        source="extension",
     )
 
     def _check(self, soup: BeautifulSoup, report: PageReport, *, html: str, url: str, ctx) -> None:

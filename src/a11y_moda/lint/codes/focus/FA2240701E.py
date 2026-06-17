@@ -1,4 +1,4 @@
-"""FA2141104E lint — `<style>` with outline:none must also have :focus rule.
+"""FA2240701E lint — `<style>` with outline:none must also have :focus rule.
 
 Examines inline <style> blocks; doesn't fetch external CSS. JSX `<style>`
 JSX expressions are also extractable when their content is a literal
@@ -20,7 +20,7 @@ _OUTLINE_NONE = re.compile(r"outline\s*:\s*(none|0(\s*px)?)\s*[;}]", re.IGNORECA
 @register
 class OutlineNoneNoFallbackLint(LintRule):
     meta = RuleMeta(
-        rule_id="FA2141104E",
+        rule_id="FA2240701E",
         guideline="2.4.7",
         level=Level.AA,
         desc="<style> 含 outline:none 但無 :focus / :focus-visible 替代",

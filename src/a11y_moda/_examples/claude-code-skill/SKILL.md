@@ -102,7 +102,7 @@ HM = HTML / 內容結構       e.g. HM1110100C = SC 1.1.1 第 100 條 (img alt)
 GN = 一般 / Gateway        e.g. GN1210100E = SC 2.1.1 (keyboard equiv)
 CS = CSS / 樣式            e.g. CS1110113E (decorative img via CSS)
 AR = ARIA                   e.g. AR2410300E (status / aria-live)
-FA = Focus / Form A         e.g. FA2141104E (outline:none + :focus 替代)
+FA = Focus / Form A         e.g. FA2240701E (outline:none + :focus 替代)
 SC = Success Criterion 級   一般少用，主要在 docs
 
 C suffix = Freego 機器規則 / E suffix = extension 人工判斷

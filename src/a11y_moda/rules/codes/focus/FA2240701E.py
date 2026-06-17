@@ -1,4 +1,4 @@
-"""FA2141104E rule."""
+"""FA2240701E rule (was FA2141104E under 110.07; renamed for 115.11)."""
 from __future__ import annotations
 import re
 from bs4 import BeautifulSoup, Tag
@@ -9,9 +9,9 @@ from ...helpers import should_skip, truncate
 
 @register
 class OutlineNoneNoFallback(Rule):
-    """FA2141104E — outline:none must come with a :focus visual replacement."""
+    """FA2240701E — outline:none must come with a :focus visual replacement."""
 
-    meta = RuleMeta(rule_id="FA2141104E", guideline="2.4.7", level=Level.AA,
+    meta = RuleMeta(rule_id="FA2240701E", guideline="2.4.7", level=Level.AA,
         desc="樣式元素的輪廓和邊框會消除或使視覺焦點指示器不可見",
         source="extension")
 

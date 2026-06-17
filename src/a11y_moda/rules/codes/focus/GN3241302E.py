@@ -1,4 +1,4 @@
-"""GN2141100E rule."""
+"""GN3241302E rule (was GN2141100E/1.4.11 under 110.07; remapped to 2.4.13 for 115.11)."""
 from __future__ import annotations
 import re
 from bs4 import Tag
@@ -9,10 +9,10 @@ from ...helpers import should_skip, truncate
 
 @register
 class FocusIndicatorAuthored(Rule):
-    """GN2141100E — author should set high-contrast focus indicator."""
+    """GN3241302E — author should provide a visible focus indicator (2.4.13)."""
 
-    meta = RuleMeta(rule_id="GN2141100E", guideline="1.4.11", level=Level.AA,
-        desc="使用網頁作者設定的高可視焦點指示器",
+    meta = RuleMeta(rule_id="GN3241302E", guideline="2.4.13", level=Level.AAA,
+        desc="使用作者提供的可見焦點指示框線",
         source="extension")
 
     def _check(self, soup, report, *, html, url, ctx) -> None:
