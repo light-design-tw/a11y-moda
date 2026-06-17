@@ -150,5 +150,11 @@
 | **ME1320200C** | 3.2.2 | 🟢 DOM | ✅ 新增 `media/ME1320200C.py` — `<a>` 指向 .doc/.docx/.xls/.xlsx/.ppt/.pptx 等專屬格式則 fail；僅看 path 副檔名（查詢字串型下載 handler 不誤判） |
 | CS3140800C | 1.4.8 | 🟡 **改判 Browser** | 單一樣式表下前景+背景色限制，需 computed CSS 串接判定，純靜態 DOM 易誤判 → 移到「復用 probe」階段（接 css_utils / contrast），非 cheap win |
 | HM1110103C | 1.1.1 | 🔵 **改判 LLM/caveat** | 「字符圖案 / emoji 挪用文字外型作表意」無法以機器決定性判斷「是否作表意」→ 不適合純 DOM，改走語意判斷或 caveat，非 cheap win |
+| **FA2241100E** | 2.4.11 | 🟡 Browser | ✅ 新增 `focus/FA2241100E.py` — 擴 tab_walk 偵測 sticky/fixed 遮蔽；聚焦元件**全遮**(obscured_fully)則 fail（部分遮蔽留 2.4.12）|
+| **CS3241301E** | 2.4.13 | 🟡 Browser | ✅ 新增 `focus/CS3241301E.py` — outline < 2px → fail（焦點框線強度）；box-shadow only → caveat。指示「有無」仍由 CS2240700E(2.4.7) 負責 |
+| CS3241300E | 2.4.13 | 🟡 **暫緩** | 雙色焦點對比 — 需相鄰色對比量測，現有 probe 無法可靠提供（避免噪音 / 與 2.4.7 重複）|
+| GN3241302E | 2.4.13 | 🟡 **暫緩** | 作者提供框線 — author-vs-UA 判別不可靠，暫緩 |
 
-> 驗證：兩條新規則經 auto-discovery 註冊、單元正反例通過、對 light-design.com.tw 靜態 AAA 掃描整合無例外無誤報。`source="freego"`（MODA 機器檢測碼）。
+> tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道），故無 state-threading gap。
+
+> 驗證：cheap-win 兩條（HM1130105C / ME1320200C）= auto-discovery 註冊 + 單元正反例 + 靜態 AAA 掃描無例外無誤報。focus 兩條（FA2241100E / CS3241301E）= 單元正反例 + scanner 兩路徑(L161/L201)透傳確認 + pytest 17 綠 + **light-design --render AAA dogfood 0 例外 0 誤報**。cheap-win `source="freego"`；focus rules `source="extension"`（E 碼）。
