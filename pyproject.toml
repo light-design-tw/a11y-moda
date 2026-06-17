@@ -1,6 +1,6 @@
 [project]
 name = "a11y-moda"
-version = "0.4.6"
+version = "0.4.7"
 description = "Taiwan MODA accessibility CLI · WCAG A/AA/AAA · zh-TW · Freego complement"
 readme = "README.md"
 license = "MIT"

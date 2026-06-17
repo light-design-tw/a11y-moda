@@ -222,6 +222,8 @@ def collect_text_samples(page_url: str, *, ua: str | None = None,
                           color_scheme: str | None = None) -> list[TextSample]:
     """Standalone: open own browser, navigate, sample. Used when no shared session."""
     from ._session import standalone_page
+    from .._security import require_safe_http_url
     with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="networkidle", timeout=30000)
+        require_safe_http_url(page.url)  # redirect may have landed on an internal host
         return collect_text_samples_from_page(page)
