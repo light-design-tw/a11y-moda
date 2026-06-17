@@ -27,7 +27,7 @@
 
 ## 為什麼做這個
 
-MODA 官方工具 [Freego](https://accessibility.moda.gov.tw/) 是 Java GUI，沒有 CLI、Docker、API 介面。`a11y-moda` 補這個缺口，給 **CI/CD pipeline** 跟 **AI 協作開發** 用。實作 MODA 公布的規則編碼 (HM / GN / CS / AR / FA / SC)，每筆 issue 標注對應 MODA rule_id 跟 WCAG 2.1 success criterion。
+MODA 官方工具 [Freego](https://accessibility.moda.gov.tw/) 是 Java GUI，沒有 CLI、Docker、API 介面。`a11y-moda` 補這個缺口，給 **CI/CD pipeline** 跟 **AI 協作開發** 用。實作 MODA 公布的規則編碼 (HM / GN / CS / AR / FA / SC / ME)，每筆 issue 標注對應 MODA rule_id 跟 WCAG 2.1 / 2.2 success criterion。自 v0.5.0 起對齊「網站無障礙規範 115.11」(WCAG 2.2)。
 
 工具分三層，對應開發流程不同階段：
 
@@ -117,10 +117,10 @@ CI 整合範例：
 
 ## `rules` / `explain` — 查 MODA 規則
 
-Knowledge service：把規則 metadata 暴露為 CLI API，給 AI agent 在**寫 code 之前**查 MODA 規範用。133 條規則全可查。
+Knowledge service：把規則 metadata 暴露為 CLI API，給 AI agent 在**寫 code 之前**查 MODA 規範用。146 條規則全可查。
 
 ```bash
-a11y-moda rules list                         # 列全部 133 條
+a11y-moda rules list                         # 列全部 146 條
 a11y-moda rules list --level AA              # 篩等級
 a11y-moda rules list --topic forms           # 篩主題
 a11y-moda rules list --source extension      # freego (機器) / extension (人工判斷) / moda-tw (在地化)
@@ -365,7 +365,7 @@ class MyRule(Rule):
 
 ## 專案狀態
 
-Pre-1.0。規則覆蓋率對齊 MODA 公布的規則集；LLM 類規則需外部 LLM 接取。1.0 前輸出 schema 可能會變動。
+Pre-1.0。規則覆蓋率對齊 MODA 公布的規則集（含 v0.5.0 起的「網站無障礙規範 115.11」/ WCAG 2.2 對齊，共 146 條規則）；LLM 類規則需外部 LLM 接取。1.0 前輸出 schema 可能會變動。
 
 完整變更紀錄見 [CHANGELOG.md](./CHANGELOG.md)。
 

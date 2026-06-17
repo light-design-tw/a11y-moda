@@ -7,6 +7,43 @@ Versioning follows [SemVer](https://semver.org/) — schema may shift before 1.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-18
+
+對齊 MODA「網站無障礙規範 115.11」（2026-11-30 起實施標章檢測，基準為 WCAG 2.2）。
+新增 13 條對應 WCAG 2.2 新增/調整成功準則的檢測規則，並把 3 條僅存在於
+110.07 的孤兒碼改名為其 115.11 對應碼。規則總數 133 → **146**。
+
+### Added
+- WCAG 2.2 新成功準則規則：
+  - 焦點不被遮（最低）2.4.11 `FA2241100E`、（增強）2.4.12 `CS3241200E`
+  - 焦點外觀 2.4.13 `CS3241301E`
+  - 目標尺寸（最低）2.5.8 `CS2250800E`
+  - 內容重排 1.4.10 `GN2141009E`
+  - 計時調整 2.2.1 `FA1220102E`（meta refresh 計時轉向）
+  - 鍵盤 2.1.1 `FA1210102E`（指標專屬事件無鍵盤路徑）
+  - 可及的驗證 3.3.8 `HM2330800E`（email/password autocomplete）、3.3.8/3.3.9 `FA2330801E`（阻擋貼上）
+  - 排版表格 1.3.1 `FA1130114E`、線性化序列 1.3.2 `FA1130204E`（需 LLM）
+  - 表單分群 1.3.1 `HM1130105C`、下載開放格式 3.2.2 `ME1320200C`
+- `tab_walk` probe 擴充：`FocusStop` 新增焦點框線幾何、bbox、sticky/fixed 遮蔽偵測，
+  供 2.4.11 / 2.4.12 / 2.4.13 使用（沿用既有 `tab_stops` 通道，無新狀態管線）。
+- 新增 reflow probe（將視窗縮至 320px 寬，檢測是否需水平捲動），新增
+  `RuleContext.reflow`，`scan`（standalone）與 `site`（shared）兩條掃描路徑皆已接上。
+
+### Changed
+- **rule_id 對齊 115.11（輸出 schema 變動，請留意自動化過濾）**：
+  - `HM3330500C` → `GN3330502E`（3.3.5）
+  - `FA2141104E` → `FA2240701E`（2.4.7；`scan` 與 `lint` 同步）
+  - `GN2141100E` → `GN3241302E`（1.4.11 → 2.4.13，等級 AA → AAA）
+  若既有流程以這些舊 `rule_id` 過濾或比對，請更新對應表。
+
+### Notes
+- 既有 110.07 無障礙標章於 2026-11-29（含）前取得者，效期仍 3 年有效；本版為工具面的
+  115.11 對齊，不影響既有標章。
+- 4 條僅存在於 110.07、115.11 無對應碼但檢查仍有效者保留為 legacy：
+  `GN1210101E`、`GN1240301E`、`HM1110108E`、`HM1130108E`。
+- 部分 WCAG 2.2 項目（雙色焦點對比、拖曳替代、字元快捷鍵、跨頁一致協助）因需視覺模型
+  或站級狀態，暫緩至後續版本。
+
 ## [0.4.7] — 2026-06-18
 
 防禦性安全強化。無使用者可見介面變動（無新 flag / command），輸出 schema 不變。
@@ -946,7 +983,8 @@ First public release on PyPI.
 - Pre-1.0: output schema may change. Pin `==0.1.x` in CI.
 - `pip install` does not download Chromium — run `playwright install chromium` before using `--render`.
 
-[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.4.7...HEAD
+[Unreleased]: https://github.com/light-design-tw/a11y-moda/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.5.0
 [0.4.7]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.7
 [0.4.6]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.6
 [0.4.5]: https://github.com/light-design-tw/a11y-moda/releases/tag/v0.4.5

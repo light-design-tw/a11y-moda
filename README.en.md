@@ -25,7 +25,7 @@
 
 ## Why
 
-The official tool — [Freego](https://accessibility.moda.gov.tw/) — is a Java GUI without CLI, Docker, or API support. `a11y-moda` is a CLI complement designed for **CI/CD pipelines** and **AI-assisted development**. It implements MODA's published accessibility rule codes (HM / GN / CS / AR / FA / SC) and maps each finding to the corresponding MODA rule ID and WCAG 2.1 success criterion.
+The official tool — [Freego](https://accessibility.moda.gov.tw/) — is a Java GUI without CLI, Docker, or API support. `a11y-moda` is a CLI complement designed for **CI/CD pipelines** and **AI-assisted development**. It implements MODA's published accessibility rule codes (HM / GN / CS / AR / FA / SC / ME) and maps each finding to the corresponding MODA rule ID and WCAG 2.1 / 2.2 success criterion. Since v0.5.0 it aligns with the *Website Accessibility Specification 115.11* (WCAG 2.2).
 
 Three layers, mapped to development workflow stages:
 
@@ -117,10 +117,10 @@ CI integration:
 
 ## `rules` / `explain` — query MODA rule knowledge
 
-Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 133 rules are queryable.
+Knowledge service — exposes the rule registry as a CLI API for AI agents to **look up MODA rules before writing code**. All 146 rules are queryable.
 
 ```bash
-a11y-moda rules list                         # list all 133
+a11y-moda rules list                         # list all 146
 a11y-moda rules list --level AA              # filter by level
 a11y-moda rules list --topic forms           # filter by topic
 a11y-moda rules list --source extension      # freego (machine) / extension (E rules) / moda-tw (localisation)
@@ -218,10 +218,10 @@ a11y-moda init <ide> --force      # overwrite existing file
 
 ## Coverage highlights
 
-- **133** registered rules covering Freego's machine-checked C rules + extension E rules + MODA-Taiwan localisation rules (v0.4.4 added the `moda-tw` source tier with `H309204` accesskey + `MT309203` sitemap-page operation notes — common AAA-certification audit findings outside the WCAG E/C system)
+- **146** registered rules covering Freego's machine-checked C rules + extension E rules + MODA-Taiwan localisation rules (v0.4.4 added the `moda-tw` source tier; v0.5.0 added 13 WCAG 2.2 rules aligning with the *Website Accessibility Specification 115.11*)
 - **20 / 20** of MODA's AAA self-evaluation questions implemented (official tool: 0)
 - **70 %** of AAA self-eval rules run without any LLM/VLM call
-- **50** `lint`-eligible source-checkable rules (subset of 133)
+- **50** `lint`-eligible source-checkable rules (subset of 146)
 - `--freego-only` filters to just the official Freego machine checks (excludes both `extension` and `moda-tw` tiers)
 - `a11y-moda site` HEAD-probes `/sitemap` (and 3 variants) after `sitemap.xml` resolution, so the human-readable 網站導覽 page is reachable for the `MT309203` rule even when not listed in `sitemap.xml`
 - **v0.4.5**: `MT309203` now cross-checks the sitemap page's accesskey description table against actual element `aria-label` / title / hidden text — text mismatches → `fail` with per-key diff listing
