@@ -50,11 +50,11 @@
 
 | rule_id | WCAG 2.2 SC | 等級 | 機制 | 復用現有機具 |
 |---|---|---|---|---|
-| FA2241100E | 2.4.11 焦點不被遮（最低） | AA | 🟡 | tab walk + bbox 量 sticky 頁首/頁尾重疊 |
-| CS3241200E | 2.4.12 焦點不被遮（增強） | AAA | 🟢 | 檢查 `scroll-padding` |
-| CS3241300E | 2.4.13 焦點外觀 | AAA | 🟡 | **復用 contrast probe** + computed outline |
-| CS3241301E | 2.4.13 焦點外觀 | AAA | 🟡 | 同上（框線對比 / 粗細） |
-| GN3241302E | 2.4.13 焦點外觀 | AAA | 🟡 | 同上（作者提供之可見焦點框線） |
+| FA2241100E | 2.4.11 焦點不被遮（最低） | AA | 🟡 | **需擴 tab_walk**：加 focused bbox + sticky 偵測（現有 FocusStop 無座標）|
+| CS3241200E | 2.4.12 焦點不被遮（增強） | AAA | 🟡 | scroll-padding 靜態查＝弱代理、易誤判；嚴謹需 runtime 量遮蔽 |
+| CS3241300E | 2.4.13 焦點外觀 | AAA | 🟡 | **需擴 tab_walk**：outline 幾何＋顏色→面積/對比（現有只有 `has_visible_outline` bool）|
+| CS3241301E | 2.4.13 焦點外觀 | AAA | 🟡 | 同上（框線對比 / 粗細）|
+| GN3241302E | 2.4.13 焦點外觀 | AAA | 🟡 | 同上（作者提供之可見焦點框線）|
 | FA2250700E | 2.5.7 拖曳動作 | AA | 🟡 | 新 probe（偵測 drag handler + 單指替代），中等成本 |
 | CS2250800E | 2.5.8 目標尺寸（最低 24px） | AA | 🟡 | 新 probe（量 click target box），簡單 |
 | GN1320600E | 3.2.6 一致的協助 | A | 🔵 | **復用 judge**（跨頁定位 contact/help 機制） |
@@ -75,19 +75,23 @@
 | FA1210401E | 2.1.4 | AA | 🟡 | 字元快捷鍵無法關閉 / 重新對應 |
 | FA1220102E | 2.2.1 | A | 🟡 | 伺服器端逾時自動轉址 |
 | FA2240701E | 2.4.7 | AA | 🟡 | outline / border 消除可見焦點框線 |
-| GN2141009E | 1.4.10 | AA | 🟡 | 320px reflow 下水平捲動區域 — **復用 responsive probe** |
-| GN3210301E | 2.1.3 | AAA | 🟡 | 全功能鍵盤可操作 — **復用 tab walk** |
+| GN2141009E | 1.4.10 | AA | 🟡 | 320px reflow 水平捲動 — **需新 reflow probe**（無現成 responsive probe）|
+| GN3210301E | 2.1.3 | AAA | 🟡 | 全功能鍵盤可操作 — 疑與 GN1210101E（2.1.1 純 DOM）高度重疊，**待驗可能 skip** |
 
-### A-3. Part A 工程量
+### A-3. Part A 工程量（2026-06-18 修正：原估「8 條復用」過樂觀）
 
-| 機制 | 條數 | 備註 |
+實查 probe 基建後重估。tab_walk 的 `FocusStop` 只帶 `has_visible_outline`(bool) + `in_viewport`(bool) — 無 outline 幾何/對比、無 bbox；且**無 responsive/reflow probe**。focus「有無指示」已由 CS2240700E（2.4.7）覆蓋。故 🟡 多數不是純復用：
+
+| 類別 | 條數 | 規則 |
 |---|---|---|
-| 🟢 純 DOM | 7 | 低成本 |
-| 🟡 Browser | 10 | **8 條復用** contrast / responsive / tab walk；**僅 2 條需新 probe**（2.5.8 目標尺寸、2.5.7 拖曳） |
-| 🔵 LLM | 3 | 1 條（3.3.7）建議僅 caveat |
-| 手動 / caveat-only | 2 | 3.3.9 等流程性 |
+| 🟢 純 DOM 低成本 | ~6 | HM1130104C / HM1130105C（已做）、FA1130114E、HM2330800E、FA2330801E |
+| 🟡 **擴 tab_walk**（FocusStop 加 outline 幾何 + bbox，一次擴餵 4 條）| 4 | FA2241100E（2.4.11）＋ 2.4.13 ×3 |
+| 🟡 **新 probe** | ~4 | GN2141009E（reflow）、CS2250800E（目標尺寸）、FA2250700E（拖曳）、CS3241200E（遮蔽 runtime）|
+| 🟡 既有 DOM/computed 可判 | ~4 | FA1210102E、FA1210401E、FA1220102E、FA2240701E（多為靜態可偵）|
+| 🔵 LLM | 3 | FA1130204E、GN1320600E、GN1330700E（弱）|
+| 手動 / caveat | 2 | GN3330900E 等流程性 |
 
-> 結論：換版新工作量輕 — **2 機器碼 + 2 新 probe + 3 LLM**，其餘復用既有機具。
+> 修正結論：純 DOM cheap win 已做完（上一輪 2 條：HM1130105C、ME1320200C）。剩餘 🟡 多需**擴 tab_walk**（加 FocusStop 欄位）或**新 probe**，會動到掃描各層的 state 透傳 — 需逐層驗證 ＋ 發版前 `--render` dogfood，非「順手復用」。優先「擴 tab_walk 一次出 4 條」CP 值最高。
 
 ---
 
@@ -125,9 +129,10 @@
 
 ## 建議排序
 
-1. **cheap wins（純 DOM 機器碼）** — 見下方「實作進度」。
-2. **復用 probe**：Part A 的 reflow（GN2141009E）、全鍵盤（GN3210301E）、焦點外觀（2.4.13 三碼）、焦點不被遮（2.4.11）— 接既有 contrast / responsive / tab walk。
-3. **新 probe**：目標尺寸（2.5.8）、拖曳（2.5.7）。
+1. **cheap wins（純 DOM 機器碼）** — 已做（HM1130105C、ME1320200C）。見下方「實作進度」。
+2. **擴 tab_walk 一次出 4 條**（CP 值最高）：FocusStop 加 outline 幾何 + bbox → 焦點外觀 2.4.13 ×3 + 焦點不被遮 2.4.11。碰 state-threading，需逐層驗 + `--render` dogfood。
+3. **新 probe**：reflow 320px（GN2141009E）、目標尺寸（2.5.8）、拖曳（2.5.7）、遮蔽 runtime（2.4.12）。
+3b. **既有 DOM/computed 可判**：FA1210102E / FA1210401E / FA1220102E / FA2240701E（靜態偵）；GN3210301E 先驗與 GN1210101E 重疊。
 4. **LLM**：一致的協助（3.2.6）。
 5. **移除 / 改名對帳**：Part B（含 13 條待核）。
 6. **backlog 擴張**（獨立 roadmap，非換版必要）：Part C 的 32 條 AI 可協助項，優先 AA（17 條）。
