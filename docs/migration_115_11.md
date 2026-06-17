@@ -154,7 +154,10 @@
 | **CS3241301E** | 2.4.13 | 🟡 Browser | ✅ 新增 `focus/CS3241301E.py` — outline < 2px → fail（焦點框線強度）；box-shadow only → caveat。指示「有無」仍由 CS2240700E(2.4.7) 負責 |
 | CS3241300E | 2.4.13 | 🟡 **暫緩** | 雙色焦點對比 — 需相鄰色對比量測，現有 probe 無法可靠提供（避免噪音 / 與 2.4.7 重複）|
 | GN3241302E | 2.4.13 | 🟡 **暫緩** | 作者提供框線 — author-vs-UA 判別不可靠，暫緩 |
+| **CS2250800E** | 2.5.8 | 🟡 Browser | ✅ 新增 `responsive/CS2250800E.py` — 復用 `tab_stops.bbox`（不需新 probe）；寬與高皆 < 24px 才 fail（避免行內文字連結誤判）|
+| **GN2141009E** | 1.4.10 | 🟡 Browser | ✅ 新增 `tools/reflow_probe.py` + `responsive/GN2141009E.py` — **新 probe**：viewport 縮 320px 量 scrollWidth>clientWidth → 水平捲動 fail。新增 `RuleContext.reflow` 欄位，**scanner 兩路徑都接** |
+| FA2250700E | 2.5.7 | 🟡 **暫緩** | 拖曳替代 — 偵測 drag handler + 判斷單指替代訊號太弱、FP 高，暫緩 |
 
-> tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道），故無 state-threading gap。
+> tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道）。reflow 則新增 `RuleContext.reflow` 欄位 — 屬真 state threading，已於 scanner 兩路徑（standalone L162 / shared L205）各自 populate 並用 localhost 固定寬頁 end-to-end 驗證兩路徑都觸發。
 
 > 驗證：cheap-win 兩條（HM1130105C / ME1320200C）= auto-discovery 註冊 + 單元正反例 + 靜態 AAA 掃描無例外無誤報。focus 兩條（FA2241100E / CS3241301E）= 單元正反例 + scanner 兩路徑(L161/L201)透傳確認 + pytest 17 綠 + **light-design --render AAA dogfood 0 例外 0 誤報**。cheap-win `source="freego"`；focus rules `source="extension"`（E 碼）。
