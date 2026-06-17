@@ -151,6 +151,7 @@ def scan_page(
             from .tools.form_probe import probe_forms
             from .tools.dialog_probe import probe_dialogs
             from .tools.carousel_probe import probe_carousels
+            from .tools.reflow_probe import probe_reflow
             # Each probe opens its own chromium context — must thread
             # color_scheme so --dark-mode actually reaches the probe pages
             # (not just the initial fetch). Shared-browser path
@@ -163,6 +164,7 @@ def scan_page(
             ctx.dialog_probes = probe_dialogs(url, color_scheme=color_scheme)
             ctx.form_sims = probe_forms(url, try_modal_triggers=probe_modals,
                                          color_scheme=color_scheme)
+            ctx.reflow = probe_reflow(url, color_scheme=color_scheme)
             ctx.browser_used = True
         except Exception as e:
             ctx.state["browser_error"] = f"{type(e).__name__}: {e}"
@@ -182,6 +184,7 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
     from .tools.form_probe import probe_forms_from_page
     from .tools.dialog_probe import probe_dialogs_from_page
     from .tools.carousel_probe import probe_carousels_from_page
+    from .tools.reflow_probe import probe_reflow_from_page
     with page_session(browser, color_scheme=color_scheme) as page:
         report, soup, html, full_png, vp_png = fetch_with_page(
             page, url, capture_screenshot=capture_shots,
@@ -206,6 +209,9 @@ def _scan_page_with_browser(url, *, browser, level, freego_compat, ignore, sourc
             # dialog probe needs the page in pristine state to find triggers
             # by their initial aria-expanded=false / inert containers.
             ctx.dialog_probes = probe_dialogs_from_page(page)
+            # Reflow resizes the viewport then restores it — order-safe — but
+            # run it before the state-mutating form probe to measure a clean DOM.
+            ctx.reflow = probe_reflow_from_page(page)
             ctx.form_sims = probe_forms_from_page(page, url, try_modal_triggers=probe_modals)
             ctx.browser_used = True
         except Exception as e:

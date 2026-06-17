@@ -38,6 +38,7 @@ class RuleContext:
     form_sims: list = field(default_factory=list)      # FormProbeResult, populated when browser scan runs
     dialog_probes: list = field(default_factory=list)  # DialogProbeResult — focus trap / skip-link checks
     carousel_probes: list = field(default_factory=list)  # CarouselProbeResult — auto-rotation detection
+    reflow: Any = None  # ReflowResult — 320px-width horizontal-scroll check (1.4.10)
     browser_used: bool = False
     llm: Any = None  # LLMClient or None — rules check before using
     full_screenshot: bytes | None = None  # full-page PNG bytes (when --render)
