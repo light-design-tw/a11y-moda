@@ -162,6 +162,9 @@
 | FA1210401E | 2.1.4 | 🔵 **暫緩** | 字元快捷鍵能否關閉/重對應 = 純 JS，靜態 DOM 偵測不到 |
 | FA2240701E | 2.4.7 | 🟡 **暫緩** | outline 移除 — runtime CS2240700E 已涵蓋（且更準），靜態版易誤判且重複 |
 | **CS3241200E** | 2.4.12 | 🟡 Browser | ✅ 新增 `focus/CS3241200E.py` — 改以**復用 obscured**（任一點被遮）取代原先 scroll-padding 弱代理；任何部分被遮即 fail（對比 2.4.11 僅全遮）。localhost 固定列遮蔽頁 e2e 驗證觸發 |
+| **FA1130114E** | 1.3.1 | 🟢 DOM | ✅ 新增 `tables/FA1130114E.py` — role=presentation/none 排版表格仍帶 th/caption/非空 summary → fail（與 HM1130107E 互補）|
+| **HM2330800E** | 3.3.8 | 🟢 DOM | ✅ 新增 `forms/HM2330800E.py` — type=email/password 缺 autocomplete（未設/off）→ fail；與 HM2130500E（1.3.5 token 合法性）互補 |
+| **FA2330801E** | 3.3.8/3.3.9 | 🟢 DOM | ✅ 新增 `forms/FA2330801E.py` — password/text 等以 inline onpaste 阻擋貼上 → fail（僅 inline handler）|
 
 > tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道）。reflow 則新增 `RuleContext.reflow` 欄位 — 屬真 state threading，已於 scanner 兩路徑（standalone L162 / shared L205）各自 populate 並用 localhost 固定寬頁 end-to-end 驗證兩路徑都觸發。
 
