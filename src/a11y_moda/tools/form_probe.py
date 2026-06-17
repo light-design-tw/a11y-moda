@@ -293,8 +293,10 @@ def probe_forms(page_url: str, *, max_forms: int = 5, timeout_ms: int = 30000,
                  ) -> list[FormProbeResult]:
     """Standalone: open own browser, navigate, probe. Used when no shared session."""
     from ._session import standalone_page
+    from .._security import require_safe_http_url
     with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
+        require_safe_http_url(page.url)  # redirect may have landed on an internal host
         try:
             page.wait_for_load_state("networkidle", timeout=5000)
         except Exception:

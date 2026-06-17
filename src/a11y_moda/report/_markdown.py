@@ -7,12 +7,31 @@ from ._aggregate import aggregate_by_rule, aggregate_by_url, aggregate_by_wcag
 from ._common import GroupBy, STATUS_BADGE, site_totals
 
 
+def _md_inline(s: str) -> str:
+    """Neutralise inline-markdown / HTML metacharacters in untrusted text
+    (scanned-page URLs, issue messages) so a target site can't inject links,
+    images, emphasis, or table breaks when the report renders as Markdown."""
+    s = s.replace("\n", " ")
+    out: list[str] = []
+    for ch in s:
+        if ch in "\\`*_[]<>|":
+            out.append("\\")
+        out.append(ch)
+    return "".join(out)
+
+
+def _md_code(s: str) -> str:
+    """Untrusted text for inside a `code span`: only a backtick breaks out;
+    pipe needs escaping when the span sits in a table cell."""
+    return s.replace("`", "'").replace("\n", " ").replace("|", r"\|")
+
+
 def page_to_markdown(p: PageReport) -> str:
     """Single-page report (used by `scan` command, not `site`)."""
-    lines: list[str] = [f"## {p.url}"]
+    lines: list[str] = [f"## {_md_inline(p.url)}"]
     lines.append(f"- HTTP: `{p.status_code}`")
     if p.fetch_error:
-        lines.append(f"- Fetch error: `{p.fetch_error}`")
+        lines.append(f"- Fetch error: `{_md_code(p.fetch_error)}`")
     counts = {"fail": 0, "info": 0, "caveat": 0}
     for i in p.issues:
         counts[i.status] = counts.get(i.status, 0) + 1
@@ -24,7 +43,7 @@ def page_to_markdown(p: PageReport) -> str:
     lines.append("| Status | Rule | WCAG | Level | Message |")
     lines.append("|---|---|---|---|---|")
     for i in p.issues:
-        msg = i.message.replace("|", r"\|").replace("\n", " ")
+        msg = _md_inline(i.message)
         lines.append(f"| {STATUS_BADGE.get(i.status, i.status)} | `{i.rule_id}` | {i.guideline} | {i.level} | {msg} |")
     return "\n".join(lines)
 
@@ -83,11 +102,11 @@ def _md_by_rule(scan: ScanReport, *, condensed: bool = False) -> list[str]:
         lines.append(f"**Pages affected: {len(r['pages'])}**")
         sample = r['pages'][:3]
         for url, msg, snippet in sample:
-            short_msg = msg.replace("\n", " ").strip()[:160]
-            lines.append(f"- `{url}`")
+            short_msg = _md_inline(msg.strip())[:160]
+            lines.append(f"- `{_md_code(url)}`")
             lines.append(f"  - {short_msg}")
             if snippet:
-                snip = snippet.replace("`", "'").replace("\n", " ")[:140]
+                snip = _md_code(snippet)[:140]
                 lines.append(f"  - 證據：`{snip}`")
         if len(r['pages']) > 3:
             lines.append(f"- _…還有 {len(r['pages']) - 3} 個頁面_")
@@ -133,13 +152,13 @@ def _md_by_url(scan: ScanReport, *, condensed: bool = False) -> list[str]:
             url_disp = r["url"]
             if len(url_disp) > 60:
                 url_disp = "…" + url_disp[-58:]
-            lines.append(f"| `{url_disp}` | {r['status_code']} | {r['fail']} | {r['info']} | {r['caveat']} | {rids} |")
+            lines.append(f"| `{_md_code(url_disp)}` | {r['status_code']} | {r['fail']} | {r['info']} | {r['caveat']} | {rids} |")
         return lines
     for r in rows:
-        lines.append(f"### {r['url']}")
+        lines.append(f"### {_md_inline(r['url'])}")
         lines.append(f"- HTTP `{r['status_code']}` · 🔴 {r['fail']} · 🟡 {r['info']} · ⚠️ {r['caveat']}")
         if r["fetch_error"]:
-            lines.append(f"- Fetch error: `{r['fetch_error']}`")
+            lines.append(f"- Fetch error: `{_md_code(r['fetch_error'])}`")
         if not r["issues"]:
             lines.append("- _No issues._")
             lines.append("")
@@ -148,7 +167,7 @@ def _md_by_url(scan: ScanReport, *, condensed: bool = False) -> list[str]:
         lines.append("| Status | Rule | WCAG | Lv | Message |")
         lines.append("|---|---|---|---|---|")
         for i in r["issues"]:
-            msg = i.message.replace("|", r"\|").replace("\n", " ")
+            msg = _md_inline(i.message)
             lines.append(f"| {STATUS_BADGE.get(i.status, i.status)} | `{i.rule_id}` | {i.guideline} | {i.level} | {msg} |")
         lines.append("")
     return lines

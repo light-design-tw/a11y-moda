@@ -203,6 +203,18 @@ _FIND_OPEN_CONTAINER_JS = r"""
 """
 
 
+_CONTAINER_VISIBLE_JS = r"""
+(sel) => {
+    try {
+        const e = document.querySelector(sel);
+        if (!e) return false;
+        const cs = getComputedStyle(e);
+        return cs.display !== 'none' && cs.visibility !== 'hidden';
+    } catch(_) { return false; }
+}
+"""
+
+
 _SKIP_LINK_JS = r"""
 () => {
     const PATTERNS = [
@@ -287,14 +299,10 @@ def _probe_one_trigger(page, cand: dict, *, max_tab_stops: int = 12) -> DialogPr
         # Esc behaviour.
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
-        # Container still visible?
-        still_open = page.evaluate(f"""() => {{
-            try {{ const e = document.querySelector({container!r});
-                   if (!e) return false;
-                   const cs = getComputedStyle(e);
-                   return cs.display !== 'none' && cs.visibility !== 'hidden';
-            }} catch(_) {{ return false; }}
-        }}""")
+        # Container still visible? `container` is page-derived; pass it as an
+        # evaluate arg (not f-string interpolation) so it can't break out of
+        # the JS string literal.
+        still_open = page.evaluate(_CONTAINER_VISIBLE_JS, container)
         res.escape_closes = not still_open
     except Exception as e:
         res.error = f"{type(e).__name__}: {e}"
@@ -379,8 +387,10 @@ def probe_dialogs(page_url: str, *, ua: str | None = None,
                   ) -> list[DialogProbeResult]:
     """Standalone: open own browser, navigate, probe dialogs."""
     from ._session import standalone_page
+    from .._security import require_safe_http_url
     with standalone_page(ua=ua, color_scheme=color_scheme) as page:
         page.goto(page_url, wait_until="domcontentloaded", timeout=timeout_ms)
+        require_safe_http_url(page.url)  # redirect may have landed on an internal host
         try:
             page.wait_for_load_state("networkidle", timeout=5000)
         except Exception:
