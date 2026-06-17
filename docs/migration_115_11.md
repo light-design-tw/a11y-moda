@@ -161,6 +161,7 @@
 | **FA1210102E** | 2.1.1 | 🟢 DOM | ✅ 新增 `keyboard/FA1210102E.py` — 僅綁指標啟動事件(onmousedown/up、pointer、touch、dblclick)且無 onclick/鍵盤 → fail。排除 hover 降 FP；僅 inline handler |
 | FA1210401E | 2.1.4 | 🔵 **暫緩** | 字元快捷鍵能否關閉/重對應 = 純 JS，靜態 DOM 偵測不到 |
 | FA2240701E | 2.4.7 | 🟡 **暫緩** | outline 移除 — runtime CS2240700E 已涵蓋（且更準），靜態版易誤判且重複 |
+| **CS3241200E** | 2.4.12 | 🟡 Browser | ✅ 新增 `focus/CS3241200E.py` — 改以**復用 obscured**（任一點被遮）取代原先 scroll-padding 弱代理；任何部分被遮即 fail（對比 2.4.11 僅全遮）。localhost 固定列遮蔽頁 e2e 驗證觸發 |
 
 > tab_walk 擴充（FocusStop 加 outline 幾何 + bbox + obscured/obscured_fully）為單一 producer，自動流向 standalone + shared 兩路徑，**無新 ctx 欄位**（騎既有 `tab_stops` 通道）。reflow 則新增 `RuleContext.reflow` 欄位 — 屬真 state threading，已於 scanner 兩路徑（standalone L162 / shared L205）各自 populate 並用 localhost 固定寬頁 end-to-end 驗證兩路徑都觸發。
 
